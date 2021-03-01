@@ -9,7 +9,7 @@
 
 Install the patched version of [Ethereum ETL][ethereum-etl] using `pip`
 
-    pip3 install https://github.com/graphsense/ethereum-etl
+    pip3 install git+https://github.com/graphsense/ethereum-etl
 
 
 [ethereum-etl]: https://github.com/graphsense/ethereum-etl
