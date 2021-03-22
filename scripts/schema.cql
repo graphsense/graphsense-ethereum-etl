@@ -14,8 +14,8 @@ CREATE TABLE block (
     state_root blob,
     receipts_root blob,
     miner blob,
-    difficulty decimal,
-    total_difficulty decimal,
+    difficulty varint,
+    total_difficulty varint,
     size int,
     extra_data blob,
     gas_limit int,
@@ -34,7 +34,7 @@ CREATE TABLE transaction (
     transaction_index smallint,
     from_address blob,
     to_address blob,
-    value decimal, // in wei, 1e18 wei = 1 ether
+    value varint, // in wei, 1e18 wei = 1 ether
     gas int,
     gas_price bigint,
     input blob,
