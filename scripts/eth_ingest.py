@@ -4,7 +4,6 @@ from argparse import ArgumentParser
 from datetime import datetime, time, timezone, date, timedelta
 from subprocess import check_output
 
-import pandas as pd
 from cassandra.cluster import Cluster
 from web3 import Web3
 
@@ -14,16 +13,15 @@ def latest_block_ingested(nodes, keyspace):
     session = cluster.connect(keyspace)
 
     result = session.execute(f"SELECT block_group FROM {keyspace}.block PER  PARTITION  LIMIT  1")
-    df = pd.DataFrame(list(result))
+    groups = [row.block_group for row in result.current_rows]
 
-    if df.empty:
+    if len(groups) == 0:
         return 0
 
-    latest_block_group = df.max()["block_group"]
+    latest_block_group = max(groups)
 
     result = session.execute(f"SELECT MAX(number) AS latest_block FROM {keyspace}.block WHERE block_group={latest_block_group}")
-    df = pd.DataFrame(list(result))
-    latest_block = df.loc[0, "latest_block"]
+    latest_block = result.current_rows[0].latest_block
 
     cluster.shutdown()
     return latest_block
@@ -38,7 +36,7 @@ def latest_block_available_before(until_date, provider_uri):
     while block["timestamp"] > until_unix:
         block = w3.eth.getBlock(block["parentHash"])
 
-    print("*** Using latest block before {}, which is: block {} at {}".format(until_date.strftime("%Y-%m-%d %H:%M:%S"), block["number"], datetime.utcfromtimestamp(block["timestamp"])))
+    print("*** Determined latest block before {}, which is: block {} at {}".format(until_date.strftime("%Y-%m-%d %H:%M:%S"), block["number"], datetime.utcfromtimestamp(block["timestamp"])))
     return block["number"]
 
 
