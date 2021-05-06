@@ -16,6 +16,7 @@ docker rm "$1" || true
 
 echo "docker run:"
 docker run --restart=always -d --name "$1" \
+    --network=graphsense-global-net \
     --cap-drop all \
     -v "$2":/var/data/ethereum-etl \
     -it ethereum-etl
