@@ -36,6 +36,12 @@ docker build -t ethereum-etl .
 
 This image includes the patched version of [Ethereum ETL][ethereum-etl] and the [Datastax bulk loader][dsbulk]. 
 
+Create a user-defined bridge network
+
+```
+docker network create graphsense-global-net
+```
+
 Start the container
 ```
 ./docker/start.sh ethereum-etl DATA_DIR
