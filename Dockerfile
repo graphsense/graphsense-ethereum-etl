@@ -38,7 +38,7 @@ RUN ln -s $INSTALLDIR/dsbulk-1.8.0/bin/dsbulk $BINDIR
 
 COPY scripts/*.py $BINDIR
 COPY scripts/*.sh $BINDIR
-COPY scripts/schema.cql $INSTALLDIR/graphsense/schema.cql
+COPY scripts/schema.cql /opt/graphsense/schema.cql
 
 USER $USER
 WORKDIR $UHOME
