@@ -40,5 +40,7 @@ COPY scripts/*.py $BINDIR
 COPY scripts/*.sh $BINDIR
 COPY scripts/schema.cql /opt/graphsense/schema.cql
 
+COPY ./docker/entrypoint.sh /
+
 USER $USER
 WORKDIR $UHOME
