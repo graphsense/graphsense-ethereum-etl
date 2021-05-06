@@ -68,7 +68,7 @@ Then start the ingest. If data exists from a previous ingest, the process will c
 eth_ingest.py -d $CASSANDRA_HOST -k $KEYSPACE -u yesterday
 ```
 
-To ingest specific block ranges:
+To ingest specific block ranges, for block and/or transaction table:
 
 ```
 eth_ingest.py -d $CASSANDRA_HOST -k $KEYSPACE -p $PROVIDER_URI -t block:46147-46150 transaction:46127-46200 
