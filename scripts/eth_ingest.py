@@ -40,14 +40,14 @@ def latest_block_available_before(until_date, provider_uri):
     return block["number"]
 
 
-def import_data(tables_to_fill, provider_uri, cassandra_hosts, keyspace, etl, dsbulk):
+def import_data(tables_to_fill, provider_uri, cassandra_hosts, keyspace, etl, dsbulk, logdir):
     for i in tables_to_fill:
         table, start_block, end_block = i
         output_string = f"{table}s-output"
         additional_arg = "--connector.csv.maxCharsPerColumn=-1" if table == "transaction" else ""
 
         etl_cmd = f"{etl} export_blocks_and_transactions --start-block {start_block} --end-block {end_block} --{output_string} - --provider-uri '{provider_uri}'"
-        dsbulk_cmd = f"{dsbulk} load -c csv -header true  -h '{cassandra_hosts}' -k {keyspace} -t {table}  {additional_arg}"
+        dsbulk_cmd = f"{dsbulk} load -logDir {logdir} -c csv -header true  -h '{cassandra_hosts}' -k {keyspace} -t {table}  {additional_arg}"
         piped = f"{etl_cmd} | {dsbulk_cmd}"
 
         check_output(piped, shell=True)
@@ -62,6 +62,7 @@ def main():
     parser.add_argument('-d', '--db_nodes', dest='db_nodes', required=True, nargs='+', metavar="'spark1,spark2'", help="list of Cassandra nodes")
     parser.add_argument('-k', '--keyspace', dest='keyspace', default="eth_raw", metavar="eth_raw", help='Cassandra keyspace to use')
     parser.add_argument('-p', '--provider_uri', dest='provider_uri', metavar='file:///var/data/geth/geth.ipc', default='file:///var/data/geth/geth.ipc', help='Ethereum client URI')
+    parser.add_argument('-l', '--logs', dest='logdir', metavar='/var/data/ethereum-etl/logs/', default='/var/data/ethereum-etl/logs/', help='directory where all log files will be stored')
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('-t', '--table_specific', dest='table_specific', nargs='+', metavar="'block:1-10,transaction:5-10'", help='ingest table block from block 1 until block 10, ..')
     group.add_argument('-u', '--update_existing', dest="until_date", metavar='[yesterday|yyyy-mm-dd]', help='update existing keyspace with new data until end of yesterday|yyyy-mm-dd')
@@ -90,7 +91,7 @@ def main():
 
     print(f'*** Starting Ethereum ingest, ingesting into Cassandra on {args.db_nodes}')
 
-    import_data(tables_to_fill, args.provider_uri, args.db_nodes, args.keyspace, ETH_ETL, DS_BULK)
+    import_data(tables_to_fill, args.provider_uri, args.db_nodes, args.keyspace, ETH_ETL, DS_BULK, args.logdir)
 
 
 if __name__ == '__main__':
