@@ -1,3 +1,2 @@
-cassandra-driver == 3.24.0
-# web3 must conform to ethereum-etl's version
-web3 == 4.7.2
+cassandra-driver==3.24.0
+git+https://github.com/graphsense/ethereum-etl
