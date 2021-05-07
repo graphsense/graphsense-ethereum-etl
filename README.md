@@ -6,10 +6,6 @@
 Download and install [Apache Cassandra][apache-cassandra] >= 3.11
 in `$CASSANDRA_HOME`.
 
-Start Cassandra (in the foreground for development purposes):
-
-    $CASSANDRA_HOME/bin/cassandra -f
-
 Connect to Cassandra via CQL
 
     $CASSANDRA_HOME/bin/cqlsh
@@ -24,70 +20,40 @@ and test if it is running
 
     (1 rows)
 
-
-
 ## Docker setup
 
-Build docker image
+Build the docker image
 
-```
-docker build -t ethereum-etl .
-```
+    docker-compose build
 
-This image includes the patched version of [Ethereum ETL][ethereum-etl] and the [Datastax bulk loader][dsbulk]. 
-
-Create a user-defined bridge network
-
-```
-docker network create graphsense-global-net
-```
-
-Start the container
-```
-./docker/start.sh ethereum-etl DATA_DIR
-```
-
-DATA_DIR is the directory on the host where data is persisted after the docker container is stopped.
-
-The arguments are mapped to the following locations inside the docker container:
-
-- `DATA_DIR`: `/var/data/ethereum-etl`
-
+This image includes the patched version of [Ethereum ETL][ethereum-etl] and
+the [Datastax bulk loader][dsbulk].
 
 ## Ingesting Ethereum blocks and transactions
 
-Get a shell
+Start a shell
 
-```
-docker exec -ti ethereum-etl /bin/bash
-```
+    docker-compose run graphsense-ethereum-etl /bin/bash
 
 Starting on a freshly installed database, first create a keyspace
 
-```
-create_keyspace.py -d $CASSANDRA_HOST -k $KEYSPACE -s /opt/graphsense/schema.cql
-```
+    create_keyspace.py -d $CASSANDRA_HOST -k $KEYSPACE -s /opt/graphsense/schema.cql
 
-Then start the ingest. If data exists from a previous ingest, the process will continue from the latest block.
+Then start the ingest. If data exists from a previous ingest, the process
+will continue from the latest block.
 
-```
-eth_ingest.py -d $CASSANDRA_HOST -k $KEYSPACE -u yesterday
-```
+    eth_ingest.py -d $CASSANDRA_HOST -k $KEYSPACE -u yesterday
 
 To ingest specific block ranges, for block and/or transaction table:
 
-```
-eth_ingest.py -d $CASSANDRA_HOST -k $KEYSPACE -p $PROVIDER_URI -t block:46147-46150 transaction:46127-46200 
-```
-
+    eth_ingest.py -d $CASSANDRA_HOST -k $KEYSPACE -p $PROVIDER_URI -t block:46147-46150 transaction:46127-46200
 
 ## Exchange rates
 
 For Ethereum the exchange rates are obtained through [CoinMarketCap][coinmarketcap]:
 
-```
-/home/dockeruser/pandas-venv/bin/python3 /usr/local/bin/ingest_rates_coinmarketcap.py -d $CASSANDRA_HOST -k $KEYSPACE 
-```
+    ~/pandas-venv/bin/python3 /usr/local/bin/ingest_rates_coinmarketcap.py -d $CASSANDRA_HOST -k $KEYSPACE
+
 
 For additional options, see `scripts/ingest_rates_coinmarketcap.py`.
 
