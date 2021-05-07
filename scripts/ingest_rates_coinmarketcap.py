@@ -6,7 +6,6 @@ from argparse import ArgumentParser
 from datetime import date, datetime, timedelta
 import json
 
-import bs4
 from cassandra.cluster import Cluster
 import pandas as pd
 import requests
