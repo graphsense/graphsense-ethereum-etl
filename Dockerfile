@@ -2,13 +2,13 @@ FROM alpine:3.11
 LABEL maintainer="contact@graphsense.info"
 
 
-ARG BINDIR=/usr/local/bin/
-ARG INSTALLDIR=/opt/graphsense-ethereum-etl/
+ARG BIN_DIR=/usr/local/bin/
+ARG INSTALL_DIR=/opt/graphsense-ethereum-etl/
 ARG USER=dockeruser
-ARG UHOME=/home/$USER
-ARG PANDAS_ENV=$UHOME/pandas-venv
+ARG HOME_DIR=/home/$USER
+ARG PANDAS_ENV=$HOME_DIR/pandas-venv
 
-COPY requirements.txt $INSTALLDIR
+COPY requirements.txt $INSTALL_DIR
 
 # install JRE (required by dsbulk) and Python prerequisites,
 # then pip3 install cassandra-driver and ethereum-etl
@@ -23,21 +23,21 @@ RUN apk --no-cache --update add bash python3 openjdk8-jre git curl && \
     python3 -m ensurepip && \
     rm -r /usr/lib/python*/ensurepip && \
     pip3 install --upgrade pip setuptools && \
-    pip3 install -r $INSTALLDIR/requirements.txt && \
+    pip3 install -r $INSTALL_DIR/requirements.txt && \
     apk del build-dependendencies && \
     rm -rf /root/.cache && \
-    ln -s /usr/bin/ethereumetl $BINDIR
+    ln -s /usr/bin/ethereumetl $BIN_DIR
 
 
 # install Datastax dsbulk
-WORKDIR $INSTALLDIR
+WORKDIR $INSTALL_DIR
 RUN curl -OL https://downloads.datastax.com/dsbulk/dsbulk-1.8.0.tar.gz && \
-    tar -xzf $INSTALLDIR/dsbulk-1.8.0.tar.gz -C  $INSTALLDIR && \
-    ln -s $INSTALLDIR/dsbulk-1.8.0/bin/dsbulk $BINDIR
+    tar -xzf $INSTALL_DIR/dsbulk-1.8.0.tar.gz -C  $INSTALL_DIR && \
+    ln -s $INSTALL_DIR/dsbulk-1.8.0/bin/dsbulk $BIN_DIR
 
 
-COPY scripts/*.py $BINDIR
-COPY scripts/*.sh $BINDIR
+COPY scripts/*.py $BIN_DIR
+COPY scripts/*.sh $BIN_DIR
 COPY scripts/schema.cql /opt/graphsense/schema.cql
 
 COPY ./docker/entrypoint.sh /
@@ -53,10 +53,10 @@ RUN apk --no-cache --update --virtual build-dependendencies add \
         python3-dev && \
     pip3 install virtualenv &&\
     virtualenv $PANDAS_ENV &&\
-    $PANDAS_ENV/bin/pip3 install pandas==1.2.4 cassandra-driver==3.24.0 requests==2.25.1 &&\
+    $PANDAS_ENV/bin/pip3 install pandas==1.2.4 cassandra-driver==3.25.0 requests==2.25.1 &&\
     apk del build-dependendencies && \
     rm -rf /root/.cache
 
 
 USER $USER
-WORKDIR $UHOME
+WORKDIR $HOME_DIR
