@@ -1,2 +1,2 @@
-cassandra-driver==3.24.0
+cassandra-driver==3.25.0
 git+https://github.com/graphsense/ethereum-etl
