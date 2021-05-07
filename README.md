@@ -81,6 +81,17 @@ eth_ingest.py -d $CASSANDRA_HOST -k $KEYSPACE -p $PROVIDER_URI -t block:46147-46
 ```
 
 
+## Exchange rates
+
+For Ethereum the exchange rates are obtained through [CoinMarketCap][coinmarketcap]:
+
+```
+/home/dockeruser/pandas-venv/bin/python3 /usr/local/bin/ingest_rates_coinmarketcap.py -d $CASSANDRA_HOST -k $KEYSPACE 
+```
+
+For additional options, see `scripts/ingest_rates_coinmarketcap.py`.
+
 [ethereum-etl]: https://github.com/graphsense/ethereum-etl
 [dsbulk]: https://github.com/datastax/dsbulk
 [apache-cassandra]: http://cassandra.apache.org/download
+[coinmarketcap]: https://coinmarketcap.com
