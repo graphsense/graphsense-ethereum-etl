@@ -12,7 +12,8 @@ def latest_block_ingested(nodes, keyspace):
     cluster = Cluster(nodes)
     session = cluster.connect(keyspace)
 
-    result = session.execute(f"SELECT block_group FROM {keyspace}.block PER  PARTITION  LIMIT  1")
+    result = session.execute(
+        f"SELECT block_group FROM {keyspace}.block PER PARTITION LIMIT 1")
     groups = [row.block_group for row in result.current_rows]
 
     if len(groups) == 0:
@@ -47,7 +48,7 @@ def import_data(tables_to_fill, provider_uri, cassandra_hosts, keyspace, etl, ds
         additional_arg = "--connector.csv.maxCharsPerColumn=-1" if table == "transaction" else ""
 
         etl_cmd = f"{etl} export_blocks_and_transactions --start-block {start_block} --end-block {end_block} --{output_string} - --provider-uri '{provider_uri}'"
-        dsbulk_cmd = f"{dsbulk} load -logDir {logdir} -c csv -header true  -h '{cassandra_hosts}' -k {keyspace} -t {table}  {additional_arg}"
+        dsbulk_cmd = f"{dsbulk} load -logDir {logdir} -c csv -header true -h '{cassandra_hosts}' -k {keyspace} -t {table} {additional_arg}"
         piped = f"{etl_cmd} | {dsbulk_cmd}"
 
         check_output(piped, shell=True)
