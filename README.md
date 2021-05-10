@@ -48,6 +48,13 @@ To ingest specific block ranges, for block and/or transaction table:
 
     eth_ingest.py -d $CASSANDRA_HOST -k $KEYSPACE -p $PROVIDER_URI -t block:46147-46150 transaction:46127-46200
 
+Provider URIs might be in the form of
+
+```
+PROVIDER_URI=http://127.0.0.1:8545
+PROVIDER_URI=file:///home/gethuser/.ethereum/geth.ipc
+```
+
 ## Exchange rates
 
 For Ethereum the exchange rates are obtained through [CoinMarketCap][coinmarketcap]:

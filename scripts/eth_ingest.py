@@ -31,7 +31,12 @@ def latest_block_ingested(nodes, keyspace):
 def latest_block_available_before(until_date, provider_uri):
     until_unix = until_date.timestamp()
 
-    w3 = Web3(Web3.HTTPProvider(provider_uri))
+    if provider_uri.lower().startswith("file://"):
+        provider = Web3.IPCProvider(provider_uri.replace("file://", "").replace("FILE://", ""))
+    else:
+        provider = Web3.HTTPProvider(provider_uri)
+
+    w3 = Web3(provider)
     block = w3.eth.getBlock('latest')
 
     while block["timestamp"] > until_unix:
