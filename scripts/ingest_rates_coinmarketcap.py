@@ -27,8 +27,6 @@ def fetch_fx_rates(symbol_list):
 
 
 def historical_coin_url(symbol, start, end):
-    start = int(start.timestamp())
-    end = int(end.timestamp())
     return 'https://web-api.coinmarketcap.com/v1/cryptocurrency/ohlcv/' + \
            f'historical?symbol={symbol}&convert=USD' + \
            f'&time_start={start}&time_end={end}'
@@ -72,8 +70,8 @@ def fetch_crypto_exchange_rates(start, end, crypto_currency):
                   'Chrome/87.0.4280.88 Safari/537.36')
     headers = {'User-Agent': user_agent}
 
-    start_date = datetime.fromisoformat(start)
-    end_date = datetime.fromisoformat(end) + timedelta(days=1)
+    start_date = date.fromisoformat(start) + timedelta(days=-1)
+    end_date = date.fromisoformat(end)
     url = historical_coin_url(crypto_currency, start_date, end_date)
 
     print(f'Fetching {crypto_currency} exchange rates\n{url}')
