@@ -65,7 +65,7 @@ def main():
 
     parser = ArgumentParser(description='Ingest Ethereum blocks and transactions into Cassandra', epilog='GraphSense - http://graphsense.info')
 
-    parser.add_argument('-d', '--db_nodes', dest='db_nodes', required=True, nargs='+', metavar="'spark1,spark2'", help="list of Cassandra nodes")
+    parser.add_argument('-d', '--db_nodes', dest='db_nodes', required=True, nargs='+', metavar="DB_NODE", help="list of Cassandra nodes")
     parser.add_argument('-k', '--keyspace', dest='keyspace', default="eth_raw", metavar="eth_raw", help='Cassandra keyspace to use')
     parser.add_argument('-p', '--provider_uri', dest='provider_uri', metavar='file:///var/data/geth/geth.ipc', default='file:///var/data/geth/geth.ipc', help='Ethereum client URI')
     parser.add_argument('-l', '--logs', dest='logdir', metavar='/var/data/ethereum-etl/logs/', default='/var/data/ethereum-etl/logs/', help='directory where all log files will be stored')
