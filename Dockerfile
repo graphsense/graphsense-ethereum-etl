@@ -8,7 +8,7 @@ ARG USER=dockeruser
 ARG HOME_DIR=/home/$USER
 ARG PANDAS_ENV=$HOME_DIR/pandas-venv
 
-COPY requirements.txt $INSTALL_DIR
+COPY requirements*.txt $INSTALL_DIR
 
 # install JRE (required by dsbulk) and Python prerequisites,
 # then pip3 install cassandra-driver and ethereum-etl
@@ -53,7 +53,7 @@ RUN apk --no-cache --update --virtual build-dependendencies add \
         python3-dev && \
     pip3 install virtualenv &&\
     virtualenv $PANDAS_ENV &&\
-    $PANDAS_ENV/bin/pip3 install pandas==1.2.4 cassandra-driver==3.25.0 requests==2.25.1 &&\
+    $PANDAS_ENV/bin/pip3 install -r $INSTALL_DIR/requirements_venv.txt  &&\
     apk del build-dependendencies && \
     rm -rf /root/.cache
 
