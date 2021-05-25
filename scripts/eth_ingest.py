@@ -42,7 +42,8 @@ def latest_block_available_before(until_date, provider_uri):
     while block["timestamp"] > until_unix:
         block = w3.eth.getBlock(block["parentHash"])
 
-    print("*** Determined latest block before {}, which is: block {} at {}".format(until_date.strftime("%Y-%m-%d %H:%M:%S"), block["number"], datetime.utcfromtimestamp(block["timestamp"])))
+    print("*** Determining latest block before {}:".format(until_date.strftime("%Y-%m-%d %H:%M:%S")))
+    print("    block {} at {}".format(block["number"], datetime.utcfromtimestamp(block["timestamp"])))
     return block["number"]
 
 
@@ -86,7 +87,8 @@ def main():
         start_block = latest_block_ingested(args.db_nodes, args.keyspace)
         end_block = latest_block_available_before(until_ts, args.provider_uri)
 
-        print(f"*** update_existing dataset: Latest block ingested {start_block}, latest block available {end_block}")
+        print(f"*** Latest block ingested: {start_block}")
+        print(f"*** Latest block available: {end_block}")
         tables_to_fill.append(("block", start_block, end_block))
         tables_to_fill.append(("transaction", start_block, end_block))
     else:
@@ -95,10 +97,11 @@ def main():
             start_block, end_block = i.split(":")[1].split("-")
             tables_to_fill.append((table, start_block, end_block))
 
-    print(f'*** Starting Ethereum ingest, ingesting into Cassandra on {args.db_nodes}')
+    print("*** Starting Ethereum ingest")
+    print("    ingesting into Cassandra on {args.db_nodes}")
 
     import_data(tables_to_fill, args.provider_uri, args.db_nodes, args.keyspace, ETH_ETL, DS_BULK, args.logdir)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
