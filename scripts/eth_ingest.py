@@ -98,7 +98,7 @@ def main():
             tables_to_fill.append((table, start_block, end_block))
 
     print("*** Starting Ethereum ingest")
-    print("    ingesting into Cassandra on {args.db_nodes}")
+    print(f"    ingesting into Cassandra on {args.db_nodes}")
 
     import_data(tables_to_fill, args.provider_uri, args.db_nodes, args.keyspace, ETH_ETL, DS_BULK, args.logdir)
 
