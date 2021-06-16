@@ -52,11 +52,10 @@ def import_data(tables_to_fill, provider_uri, cassandra_hosts, keyspace, etl, ds
         table, start_block, end_block = i
         output_string = f"{table}s-output"
         additional_arg = "--connector.csv.maxCharsPerColumn=-1" if table == "transaction" else ""
-        csv_header_fix = " | sed 's/\\,number\\,/\\,block_number\\,/g' | sed 's/\\,hash\\,/\\,block_hash\\,/g' | " if table == "block" else "|"
 
         etl_cmd = f"{etl} export_blocks_and_transactions --start-block {start_block} --end-block {end_block} --{output_string} - --provider-uri '{provider_uri}'"
         dsbulk_cmd = f"{dsbulk} load -logDir {logdir} -c csv -header true -h '{cassandra_hosts}' -k {keyspace} -t {table} {additional_arg}"
-        piped = f"{etl_cmd} {csv_header_fix} {dsbulk_cmd}"
+        piped = f"{etl_cmd} | {dsbulk_cmd}"
 
         check_output(piped, shell=True)
 
