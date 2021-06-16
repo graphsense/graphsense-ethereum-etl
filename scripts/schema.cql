@@ -46,3 +46,8 @@ CREATE TABLE exchange_rates (
     date text PRIMARY KEY,
     fiat_values map<text, float>
 );
+
+CREATE TABLE configuration (
+    id text PRIMARY KEY,
+    block_bucket_size int
+);

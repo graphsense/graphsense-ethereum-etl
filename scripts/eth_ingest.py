@@ -52,7 +52,7 @@ def import_data(tables_to_fill, provider_uri, cassandra_hosts, keyspace, etl, ds
         table, start_block, end_block = i
         output_string = f"{table}s-output"
         additional_arg = "--connector.csv.maxCharsPerColumn=-1" if table == "transaction" else ""
-        csv_header_fix = " | sed 's/\\,number\\,/\\,block_number\\,/g' | sed 's/\\,hash\\,/\\,block_hash\\,/g' | " if table == "block" else ""
+        csv_header_fix = " | sed 's/\\,number\\,/\\,block_number\\,/g' | sed 's/\\,hash\\,/\\,block_hash\\,/g' | " if table == "block" else "|"
 
         etl_cmd = f"{etl} export_blocks_and_transactions --start-block {start_block} --end-block {end_block} --{output_string} - --provider-uri '{provider_uri}'"
         dsbulk_cmd = f"{dsbulk} load -logDir {logdir} -c csv -header true -h '{cassandra_hosts}' -k {keyspace} -t {table} {additional_arg}"
@@ -102,6 +102,14 @@ def main():
     print(f"    ingesting into Cassandra on {args.db_nodes}")
 
     import_data(tables_to_fill, args.provider_uri, args.db_nodes, args.keyspace, ETH_ETL, DS_BULK, args.logdir)
+
+    # write configuration table
+    block_bucket_size = int(1e5)  # as defined in ethereum-etl block_mapper.py
+    cluster = Cluster(args.db_nodes)
+    session = cluster.connect(args.keyspace)
+    cql_str = '''INSERT INTO configuration (id, block_bucket_size) VALUES (%s, %s)'''
+    session.execute(cql_str, (args.keyspace, block_bucket_size))
+    cluster.shutdown()
 
 
 if __name__ == "__main__":
