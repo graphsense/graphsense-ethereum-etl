@@ -4,8 +4,8 @@ USE eth_raw;
 
 CREATE TABLE block (
     block_group int,
-    number int,
-    hash blob,
+    block_number int,
+    block_hash blob,
     parent_hash blob,
     nonce blob,
     sha3_uncles blob,
@@ -22,7 +22,7 @@ CREATE TABLE block (
     gas_used int,
     timestamp int,
     transaction_count smallint,
-    PRIMARY KEY (block_group, number)
+    PRIMARY KEY (block_group, block_number)
 );
 
 CREATE TABLE transaction (
