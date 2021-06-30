@@ -104,10 +104,11 @@ def main():
 
     # write configuration table
     block_bucket_size = int(1e5)  # as defined in ethereum-etl block_mapper.py
+    tx_prefix_length = 4  # as defined in ethereum-etl transaction_mapper.py
     cluster = Cluster(args.db_nodes)
     session = cluster.connect(args.keyspace)
-    cql_str = '''INSERT INTO configuration (id, block_bucket_size) VALUES (%s, %s)'''
-    session.execute(cql_str, (args.keyspace, block_bucket_size))
+    cql_str = '''INSERT INTO configuration (id, block_bucket_size, tx_prefix_length) VALUES (%s, %s, %s)'''
+    session.execute(cql_str, (args.keyspace, block_bucket_size, tx_prefix_length))
     cluster.shutdown()
 
 

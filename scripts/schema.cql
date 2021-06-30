@@ -49,5 +49,6 @@ CREATE TABLE exchange_rates (
 
 CREATE TABLE configuration (
     id text PRIMARY KEY,
-    block_bucket_size int
+    block_bucket_size int,
+    tx_prefix_length int
 );
