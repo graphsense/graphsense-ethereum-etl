@@ -42,6 +42,28 @@ CREATE TABLE transaction (
     PRIMARY KEY (hash_prefix, hash)
 );
 
+CREATE TABLE trace (
+    block_number int,
+    transaction_hash blob,
+    transaction_index smallint,
+    from_address blob,
+    to_address blob,
+    value varint,
+    input blob,
+    output blob,
+    trace_type text,
+    call_type text,
+    reward_type text,
+    gas int,
+    gas_used bigint,
+    subtraces smallint,
+    trace_address text,
+    error text,
+    status smallint,
+    trace_id text,
+    PRIMARY KEY (block_number, trace_id)
+);
+
 CREATE TABLE exchange_rates (
     date text PRIMARY KEY,
     fiat_values map<text, float>
