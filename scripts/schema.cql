@@ -43,6 +43,7 @@ CREATE TABLE transaction (
 );
 
 CREATE TABLE trace (
+    block_group int,
     block_number int,
     transaction_hash blob,
     transaction_index smallint,
@@ -61,7 +62,7 @@ CREATE TABLE trace (
     error text,
     status smallint,
     trace_id text,
-    PRIMARY KEY (block_number, trace_id)
+    PRIMARY KEY (block_group, block_number, trace_id)
 );
 
 CREATE TABLE exchange_rates (
