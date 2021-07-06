@@ -3,9 +3,41 @@
 from argparse import ArgumentParser
 from datetime import datetime, time, timezone, date, timedelta
 from subprocess import check_output
+import os
 
 from cassandra.cluster import Cluster
+from cassandra.query import SimpleStatement
 from web3 import Web3
+
+
+BLOCK_BUCKET_SIZE = int(1e5)  # as defined in ethereum-etl block_mapper.py
+TX_PREFIX_LENGTH = 4  # as defined in ethereum-etl transaction_mapper.py
+
+
+def ingest_receipts_for_blockrange(session, table, block_group, from_block, to_block, provider_uri, cassandra_hosts, keyspace, etl, dsbulk, logdir):
+    tempfile = f"{from_block}.txt"
+
+    query = f"SELECT transaction_hash FROM {keyspace}.trace WHERE block_group = {block_group} AND block_number >= {from_block} AND block_number <= {to_block} "
+    statement = SimpleStatement(query, fetch_size=100_000)
+
+    tx_ids = []
+
+    for row in session.execute(statement):
+        if row.transaction_hash is not None:
+            tx_ids.append("0x"+row.transaction_hash.hex())
+
+    if len(tx_ids) > 0:
+        with open(tempfile, mode='w', encoding='utf-8') as tx_hashes_file:
+            tx_hashes_file.write('\n'.join(tx_ids))
+
+        etl_cmd = f"{etl} export_receipts_and_logs -p {provider_uri} -t {tempfile}  --receipts-output -"
+        dsbulk_cmd = f"{dsbulk} load -logDir {logdir} -c csv -header true -h '{cassandra_hosts}' -k {keyspace} -t {table} --connector.csv.maxCharsPerColumn=-1"
+
+        piped = f"{etl_cmd} | {dsbulk_cmd}"
+
+        check_output(piped, shell=True)
+
+        os.remove(tempfile)
 
 
 def latest_block_ingested(nodes, keyspace):
@@ -47,17 +79,50 @@ def latest_block_available_before(until_date, provider_uri):
     return block["number"]
 
 
+def check_table_order(s):
+    if "receipt" in s and "transaction" in s and s.index("receipt") < s.index("transaction"):
+        raise ValueError(f"transactions must be ingested before receipts, please adjust your argument line {s}")
+
+
+def import_traces(table, start_block, end_block, provider_uri, cassandra_hosts, keyspace, etl, dsbulk, logdir):
+    etl_cmd = f"{etl} export_traces --start-block {start_block} --end-block {end_block} --output - --provider-uri '{provider_uri}'"
+    dsbulk_cmd = f"{dsbulk} load -logDir {logdir} -c csv -header true -h '{cassandra_hosts}' -k {keyspace} -t {table} --connector.csv.maxCharsPerColumn=-1"
+    piped = f"{etl_cmd} | {dsbulk_cmd}"
+
+    check_output(piped, shell=True)
+
+
+def import_receipts(table, start_block, end_block, provider_uri, cassandra_hosts, keyspace, etl, dsbulk, logdir):
+    cluster = Cluster(cassandra_hosts)
+    session = cluster.connect(keyspace)
+
+    for block_number in range(start_block, end_block, BLOCK_BUCKET_SIZE):
+        from_block = block_number
+        to_block = min(end_block, from_block+BLOCK_BUCKET_SIZE-1)
+        ingest_receipts_for_blockrange(session, table, int(from_block // BLOCK_BUCKET_SIZE), from_block, to_block, provider_uri, cassandra_hosts, keyspace, etl, dsbulk, logdir)
+
+
+def import_blocks_and_transactions(table, start_block, end_block, provider_uri, cassandra_hosts, keyspace, etl, dsbulk, logdir):
+    output_string = f"{table}s-output"
+    additional_arg = "--connector.csv.maxCharsPerColumn=-1" if table == "transaction" else ""
+
+    etl_cmd = f"{etl} export_blocks_and_transactions --start-block {start_block} --end-block {end_block} --{output_string} - --provider-uri '{provider_uri}'"
+    dsbulk_cmd = f"{dsbulk} load -logDir {logdir} -c csv -header true -h '{cassandra_hosts}' -k {keyspace} -t {table} {additional_arg}"
+    piped = f"{etl_cmd} | {dsbulk_cmd}"
+
+    check_output(piped, shell=True)
+
+
 def import_data(tables_to_fill, provider_uri, cassandra_hosts, keyspace, etl, dsbulk, logdir):
     for i in tables_to_fill:
         table, start_block, end_block = i
-        output_string = f"{table}s-output"
-        additional_arg = "--connector.csv.maxCharsPerColumn=-1" if table == "transaction" else ""
-
-        etl_cmd = f"{etl} export_blocks_and_transactions --start-block {start_block} --end-block {end_block} --{output_string} - --provider-uri '{provider_uri}'"
-        dsbulk_cmd = f"{dsbulk} load -logDir {logdir} -c csv -header true -h '{cassandra_hosts}' -k {keyspace} -t {table} {additional_arg}"
-        piped = f"{etl_cmd} | {dsbulk_cmd}"
-
-        check_output(piped, shell=True)
+        start_block, end_block = int(start_block), int(end_block)
+        if table in ["block", "transaction"]:
+            import_blocks_and_transactions(table, start_block, end_block, provider_uri, cassandra_hosts, keyspace, etl, dsbulk, logdir)
+        if table == "trace":
+            import_traces(table, start_block, end_block, provider_uri, cassandra_hosts, keyspace, etl, dsbulk, logdir)
+        if table == "receipt":
+            import_receipts(table, start_block, end_block, provider_uri, cassandra_hosts, keyspace, etl, dsbulk, logdir)
 
 
 def main():
@@ -71,7 +136,7 @@ def main():
     parser.add_argument('-p', '--provider_uri', dest='provider_uri', metavar='file:///var/data/geth/geth.ipc', default='file:///var/data/geth/geth.ipc', help='Ethereum client URI')
     parser.add_argument('-l', '--logs', dest='logdir', metavar='/var/data/ethereum-etl/logs/', default='/var/data/ethereum-etl/logs/', help='directory where all log files will be stored')
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('-t', '--table_specific', dest='table_specific', nargs='+', metavar="'block:1-10,transaction:5-10'", help='ingest table block from block 1 until block 10, ..')
+    group.add_argument('-t', '--table_specific', dest='table_specific', nargs='+', metavar="'block:1-10 transaction:5-10 trace:5-10 receipt:5-10'", help='ingest table block from block 1 until block 10, ..')
     group.add_argument('-u', '--update_existing', dest="until_date", metavar='[yesterday|yyyy-mm-dd]', help='update existing keyspace with new data until end of yesterday|yyyy-mm-dd')
 
     args = parser.parse_args()
@@ -91,7 +156,10 @@ def main():
         print(f"*** Latest block available: {end_block}")
         tables_to_fill.append(("block", start_block, end_block))
         tables_to_fill.append(("transaction", start_block, end_block))
+        tables_to_fill.append(("trace", start_block, end_block))
+        tables_to_fill.append(("receipt", start_block, end_block))
     else:
+        check_table_order(args.table_specific)
         for i in args.table_specific:
             table = i.split(":")[0]
             start_block, end_block = i.split(":")[1].split("-")
@@ -103,12 +171,10 @@ def main():
     import_data(tables_to_fill, args.provider_uri, args.db_nodes, args.keyspace, ETH_ETL, DS_BULK, args.logdir)
 
     # write configuration table
-    block_bucket_size = int(1e5)  # as defined in ethereum-etl block_mapper.py
-    tx_prefix_length = 4  # as defined in ethereum-etl transaction_mapper.py
     cluster = Cluster(args.db_nodes)
     session = cluster.connect(args.keyspace)
     cql_str = '''INSERT INTO configuration (id, block_bucket_size, tx_prefix_length) VALUES (%s, %s, %s)'''
-    session.execute(cql_str, (args.keyspace, block_bucket_size, tx_prefix_length))
+    session.execute(cql_str, (args.keyspace, BLOCK_BUCKET_SIZE, TX_PREFIX_LENGTH))
     cluster.shutdown()
 
 
