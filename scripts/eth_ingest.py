@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import urllib
 from argparse import ArgumentParser
 from datetime import datetime, time, timezone, date, timedelta
 from subprocess import check_output
 import os
+import json
 
 from cassandra.cluster import Cluster
 from cassandra.query import SimpleStatement
@@ -125,6 +127,15 @@ def import_data(tables_to_fill, provider_uri, cassandra_hosts, keyspace, etl, ds
             import_receipts(table, start_block, end_block, provider_uri, cassandra_hosts, keyspace, etl, dsbulk, logdir)
 
 
+def import_genesis_transfers(session):
+    insert = session.prepare("INSERT INTO genesis_transfer (address, value) VALUES (?, ?)")
+
+    with urllib.request.urlopen("https://raw.githubusercontent.com/openethereum/openethereum/main/crates/ethcore/res/chainspec/foundation.json") as url:
+        for (k, b) in json.loads(url.read().decode())["accounts"].items():
+            if "balance" in b.keys():
+                session.execute(insert, (bytearray.fromhex(k[2:]), int(b["balance"], 16)))
+
+
 def main():
     ETH_ETL = "/usr/local/bin/ethereumetl"
     DS_BULK = "/usr/local/bin/dsbulk"
@@ -175,6 +186,9 @@ def main():
     session = cluster.connect(args.keyspace)
     cql_str = '''INSERT INTO configuration (id, block_bucket_size, tx_prefix_length) VALUES (%s, %s, %s)'''
     session.execute(cql_str, (args.keyspace, BLOCK_BUCKET_SIZE, TX_PREFIX_LENGTH))
+
+    import_genesis_transfers(session)  # downloads genesis transfers from openethereum repo
+
     cluster.shutdown()
 
 

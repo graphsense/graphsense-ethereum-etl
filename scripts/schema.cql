@@ -79,6 +79,11 @@ CREATE TABLE receipt (
     PRIMARY KEY (transaction_hash_prefix, transaction_hash)
 );
 
+CREATE TABLE genesis_transfer (
+    address blob PRIMARY KEY,
+    value varint
+);
+
 CREATE TABLE exchange_rates (
     date text PRIMARY KEY,
     fiat_values map<text, float>
