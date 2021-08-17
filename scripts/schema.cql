@@ -74,8 +74,8 @@ CREATE TABLE receipt (
     cumulative_gas_used int,
     gas_used bigint,
     contract_address blob,
-    root blob,  //32 bytes of post-transaction stateroot - pre Byzantium, before block 4_370_000
-    status smallint, // Either 1 (success) or 0 (failure) - post Byzantium
+    root blob, // 32 bytes of post-transaction stateroot - pre Byzantium, before block 4_370_000
+    status smallint, // either 1 (success) or 0 (failure) - post Byzantium
     PRIMARY KEY (transaction_hash_prefix, transaction_hash)
 );
 
