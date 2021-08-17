@@ -19,7 +19,10 @@ TX_PREFIX_LENGTH = 4  # as defined in ethereum-etl transaction_mapper.py
 def ingest_receipts_for_blockrange(session, table, block_group, from_block, to_block, provider_uri, cassandra_hosts, keyspace, etl, dsbulk, logdir):
     tempfile = f"{from_block}.txt"
 
-    query = f"SELECT transaction_hash FROM {keyspace}.trace WHERE block_id_group = {block_group} AND block_id >= {from_block} AND block_id <= {to_block} "
+    query = f"""SELECT transaction_hash FROM {keyspace}.trace
+                WHERE block_id_group = {block_group}
+                AND block_id >= {from_block}
+                AND block_id <= {to_block}"""
     statement = SimpleStatement(query, fetch_size=100_000)
 
     tx_ids = []
@@ -55,7 +58,9 @@ def latest_block_ingested(nodes, keyspace):
 
     latest_block_group = max(groups)
 
-    result = session.execute(f"SELECT MAX(number) AS latest_block FROM {keyspace}.block WHERE block_id_group={latest_block_group}")
+    result = session.execute(
+        f"""SELECT MAX(number) AS latest_block FROM {keyspace}.block
+            WHERE block_id_group={latest_block_group}""")
     latest_block = result.current_rows[0].latest_block
 
     cluster.shutdown()
@@ -73,7 +78,7 @@ def latest_block_available_before(until_date, provider_uri):
     w3 = Web3(provider)
     block = w3.eth.getBlock('latest')
 
-    while block["timestamp"] > until_unix:
+    while block["timestamp"] >= until_unix:
         block = w3.eth.getBlock(block["parentHash"])
 
     print("*** Determining latest block before {}:".format(until_date.strftime("%Y-%m-%d %H:%M:%S")))
