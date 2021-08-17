@@ -3,8 +3,8 @@ CREATE KEYSPACE IF NOT EXISTS eth_raw
 USE eth_raw;
 
 CREATE TABLE block (
-    block_group int,
-    block_number int,
+    block_id_group int,
+    block_id int,
     block_hash blob,
     parent_hash blob,
     nonce blob,
@@ -22,7 +22,7 @@ CREATE TABLE block (
     gas_used int,
     timestamp int,
     transaction_count smallint,
-    PRIMARY KEY (block_group, block_number)
+    PRIMARY KEY (block_id_group, block_id)
 );
 
 CREATE TABLE transaction (
@@ -30,7 +30,7 @@ CREATE TABLE transaction (
     hash blob,
     nonce int,
     block_hash blob,
-    block_number int,
+    block_id int,
     transaction_index smallint,
     from_address blob,
     to_address blob,
@@ -43,8 +43,8 @@ CREATE TABLE transaction (
 );
 
 CREATE TABLE trace (
-    block_group int,
-    block_number int,
+    block_id_group int,
+    block_id int,
     transaction_hash blob,
     transaction_index smallint,
     from_address blob,
@@ -62,7 +62,7 @@ CREATE TABLE trace (
     error text,
     status smallint,
     trace_id text,
-    PRIMARY KEY (block_group, block_number, trace_id)
+    PRIMARY KEY (block_id_group, block_id, trace_id)
 );
 
 CREATE TABLE receipt (
@@ -70,7 +70,7 @@ CREATE TABLE receipt (
     transaction_hash blob,
     transaction_index smallint,
     block_hash blob,
-    block_number int,
+    block_id int,
     cumulative_gas_used int,
     gas_used bigint,
     contract_address blob,

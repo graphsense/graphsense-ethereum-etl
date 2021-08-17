@@ -19,7 +19,7 @@ TX_PREFIX_LENGTH = 4  # as defined in ethereum-etl transaction_mapper.py
 def ingest_receipts_for_blockrange(session, table, block_group, from_block, to_block, provider_uri, cassandra_hosts, keyspace, etl, dsbulk, logdir):
     tempfile = f"{from_block}.txt"
 
-    query = f"SELECT transaction_hash FROM {keyspace}.trace WHERE block_group = {block_group} AND block_number >= {from_block} AND block_number <= {to_block} "
+    query = f"SELECT transaction_hash FROM {keyspace}.trace WHERE block_id_group = {block_group} AND block_id >= {from_block} AND block_id <= {to_block} "
     statement = SimpleStatement(query, fetch_size=100_000)
 
     tx_ids = []
@@ -47,7 +47,7 @@ def latest_block_ingested(nodes, keyspace):
     session = cluster.connect(keyspace)
 
     result = session.execute(
-        f"SELECT block_group FROM {keyspace}.block PER PARTITION LIMIT 1")
+        f"SELECT block_id_group FROM {keyspace}.block PER PARTITION LIMIT 1")
     groups = [row.block_group for row in result.current_rows]
 
     if len(groups) == 0:
@@ -55,7 +55,7 @@ def latest_block_ingested(nodes, keyspace):
 
     latest_block_group = max(groups)
 
-    result = session.execute(f"SELECT MAX(number) AS latest_block FROM {keyspace}.block WHERE block_group={latest_block_group}")
+    result = session.execute(f"SELECT MAX(number) AS latest_block FROM {keyspace}.block WHERE block_id_group={latest_block_group}")
     latest_block = result.current_rows[0].latest_block
 
     cluster.shutdown()
