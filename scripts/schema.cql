@@ -80,6 +80,7 @@ CREATE TABLE receipt (
 );
 
 CREATE TABLE genesis_transfer (
+    address_id int,
     address blob PRIMARY KEY,
     value varint
 );
