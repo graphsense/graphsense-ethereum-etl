@@ -39,6 +39,7 @@ RUN curl -OL https://downloads.datastax.com/dsbulk/dsbulk-1.8.0.tar.gz && \
 COPY scripts/*.py $BIN_DIR
 COPY scripts/*.sh $BIN_DIR
 COPY scripts/schema.cql /opt/graphsense/schema.cql
+COPY scripts/genesis_transfers.csv /opt/graphsense/genesis_transfers.csv
 
 COPY ./docker/entrypoint.sh /
 
