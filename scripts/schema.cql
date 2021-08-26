@@ -57,7 +57,7 @@ CREATE TABLE trace (
     reward_type text,
     gas int,
     gas_used bigint,
-    subtraces smallint,
+    subtraces int,
     trace_address text,
     error text,
     status smallint,
