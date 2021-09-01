@@ -26,8 +26,8 @@ CREATE TABLE block (
 );
 
 CREATE TABLE transaction (
-    hash_prefix text,
-    hash blob,
+    tx_hash_prefix text,
+    tx_hash blob,
     nonce int,
     block_hash blob,
     block_id int,
@@ -39,13 +39,22 @@ CREATE TABLE transaction (
     gas_price bigint,
     input blob,
     block_timestamp int,
-    PRIMARY KEY (hash_prefix, hash)
+    max_fee_per_gas bigint,
+    max_priority_fee_per_gas bigint,
+    transaction_type bigint,
+    receipt_cumulative_gas_used bigint,
+    receipt_gas_used bigint,
+    receipt_contract_address blob,
+    receipt_root blob,
+    receipt_status bigint,
+    receipt_effective_gas_price bigint,
+    PRIMARY KEY (tx_hash_prefix, tx_hash)
 );
 
 CREATE TABLE trace (
     block_id_group int,
     block_id int,
-    transaction_hash blob,
+    tx_hash blob,
     transaction_index smallint,
     from_address blob,
     to_address blob,
@@ -71,7 +80,7 @@ CREATE TABLE receipt (
     transaction_index smallint,
     block_hash blob,
     block_id int,
-    cumulative_gas_used int,
+    cumulative_gas_used bigint,
     gas_used bigint,
     contract_address blob,
     root blob, // 32 bytes of post-transaction stateroot - pre Byzantium, before block 4_370_000
