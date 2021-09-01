@@ -389,6 +389,16 @@ def main():
     print(f'[{datetime.now().isoformat()}] Processed block range '
           f'{start_block:,}:{end_block:,}')
 
+    # store configuration details
+    cql_str = '''INSERT INTO configuration
+                 (id, block_bucket_size, tx_prefix_length)
+                 VALUES (%s, %s, %s)'''
+    session.execute(cql_str,
+                    (args.keyspace,
+                     int(BLOCK_BUCKET_SIZE),
+                     int(TX_HASH_PREFIX_LEN),
+                    ))
+
     cluster.shutdown()
 
 
