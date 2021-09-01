@@ -270,12 +270,10 @@ def ingest_traces(items, session, table='trace', block_bucket_size = 100_000):
     for item in items:
         # remove column
         item.pop('type')
-        # rename, modify and add columns
+        # rename/add columns
         item['tx_hash'] = item.pop('transaction_hash')
         item['block_id'] = item.pop('block_number')
         item['block_id_group'] = item['block_id'] // block_bucket_size
-        item['trace_address'] = ','.join(str(item['trace_address'])) \
-            if item['trace_address'] is not None else None
         # convert hex strings to byte arrays (blob in Cassandra)
         for elem in blob_colums:
             item[elem] = hex_to_bytearray(item[elem])
@@ -364,7 +362,7 @@ def main():
         receipts, _ = adapter.export_receipts_and_logs(txs)
         traces = adapter.export_traces(block_id, current_end_block, True, True)
 
-        # filter traces relevent for balance calculation
+        # filter traces relevant for balance calculation
         filtered_traces = [elem for elem in traces
                            if (elem['status'] == 1) and
                               (not elem['call_type'] or

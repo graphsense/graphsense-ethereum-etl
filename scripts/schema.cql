@@ -67,7 +67,7 @@ CREATE TABLE trace (
     gas int,
     gas_used bigint,
     subtraces int,
-    trace_address text,
+    trace_address list<int>,
     error text,
     status smallint,
     trace_id text,
