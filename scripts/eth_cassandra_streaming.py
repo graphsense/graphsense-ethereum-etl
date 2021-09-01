@@ -31,7 +31,6 @@ class InMemoryItemExporter:
         item_type = item.get('type', None)
         if item_type is None:
             raise ValueError(f'type key is not found in item {item}')
-        #item.pop('type')
         self.items[item_type].append(item)
 
     def close(self):
@@ -120,12 +119,15 @@ class EthStreamerAdapter:
 def hex_to_bytearray(hex_str):
     return bytearray.fromhex(hex_str[2:]) if hex_str is not None else None
 
+
 def build_cql_insert_stmt(columns, table):
     return 'INSERT INTO %s (%s) VALUES (%s);' % \
         (table, ', '.join(columns), ('?,' * len(columns))[:-1])
 
+
 def get_last_synced_block(batch_web3_provider):
     return int(Web3(batch_web3_provider).eth.getBlock('latest').number)
+
 
 def get_last_ingested_block(session, keyspace):
     result = session.execute(
@@ -145,6 +147,7 @@ def get_last_ingested_block(session, keyspace):
 
     return max_block
 
+
 def cassandra_ingest(session, prepared_stmt, parameters, concurrency=100):
     results = execute_concurrent_with_args(
         session=session,
@@ -159,6 +162,7 @@ def cassandra_ingest(session, prepared_stmt, parameters, concurrency=100):
                 print(e)
                 continue
             break
+
 
 def ingest_blocks(items, session, table='block', block_bucket_size=100_000):
     columns = [
@@ -199,6 +203,7 @@ def ingest_blocks(items, session, table='block', block_bucket_size=100_000):
             item[elem] = hex_to_bytearray(item[elem])
 
     cassandra_ingest(session, prepared_stmt, items)
+
 
 def ingest_txs(items, session, table='transaction', tx_hash_prefix_len=4):
     columns = [
@@ -242,7 +247,8 @@ def ingest_txs(items, session, table='transaction', tx_hash_prefix_len=4):
 
     cassandra_ingest(session, prepared_stmt, items)
 
-def ingest_traces(items, session, table='trace', block_bucket_size = 100_000):
+
+def ingest_traces(items, session, table='trace', block_bucket_size=100_000):
     columns = [
         'block_id_group',
         'block_id',
@@ -280,16 +286,17 @@ def ingest_traces(items, session, table='trace', block_bucket_size = 100_000):
 
     cassandra_ingest(session, prepared_stmt, items)
 
+
 def create_parser():
     parser = ArgumentParser(
         description='ethereum-etl ingest into Apache Cassandra',
         epilog='GraphSense - http://graphsense.info')
-    #parser.add_argument('--concurrency', dest='concurrency',
-    #                    type=int, default=100,
-    #                    help='Cassandra concurrency parameter (default 100)')
-    #parser.add_argument('--continue', action='store_true',
-    #                    dest='continue_ingest',
-    #                    help='continue ingest from last block')
+    # parser.add_argument('--concurrency', dest='concurrency',
+    #                     type=int, default=100,
+    #                     help='Cassandra concurrency parameter (default 100)')
+    # parser.add_argument('--continue', action='store_true',
+    #                     dest='continue_ingest',
+    #                     help='continue ingest from last block')
     parser.add_argument('-d', '--db_nodes', dest='db_nodes', nargs='+',
                         default=['localhost'], metavar='DB_NODE',
                         help='list of Cassandra nodes; default "localhost")')
@@ -298,11 +305,11 @@ def create_parser():
     parser.add_argument('-k', '--keyspace',
                         dest='keyspace', required=True,
                         help='Cassandra keyspace')
-    #parser.add_argument('-p', '--previous_day', dest='prev_day',
-    #                    action='store_true',
-    #                    help='only ingest blocks up to the previous day, '
-    #                         'since currency exchange rates might not be '
-    #                         'available for the current day')
+    # parser.add_argument('-p', '--previous_day', dest='prev_day',
+    #                     action='store_true',
+    #                     help='only ingest blocks up to the previous day, '
+    #                          'since currency exchange rates might not be '
+    #                          'available for the current day')
     parser.add_argument('-w', '--web3-provider-uri',
                         dest='provider_uri', required=True,
                         help='Web3 provider URI')
@@ -314,6 +321,7 @@ def create_parser():
                         help='end block (default: last available block)')
     return parser
 
+
 def main():
 
     parser = create_parser()
@@ -323,7 +331,8 @@ def main():
     TX_HASH_PREFIX_LEN = 4
 
     thread_proxy = ThreadLocalProxy(
-        lambda: get_provider_from_uri(args.provider_uri, timeout=180, batch=True)
+        lambda: get_provider_from_uri(
+                    args.provider_uri, timeout=180, batch=True)
     )
 
     cluster = Cluster(args.db_nodes)
@@ -385,7 +394,6 @@ def main():
             time1 = time2
             count = 0
 
-
     print(f'[{datetime.now().isoformat()}] Processed block range '
           f'{start_block:,}:{end_block:,}')
 
@@ -393,11 +401,10 @@ def main():
     cql_str = '''INSERT INTO configuration
                  (id, block_bucket_size, tx_prefix_length)
                  VALUES (%s, %s, %s)'''
-    session.execute(cql_str,
-                    (args.keyspace,
-                     int(BLOCK_BUCKET_SIZE),
-                     int(TX_HASH_PREFIX_LEN),
-                    ))
+    session.execute(
+        cql_str,
+        (args.keyspace, int(BLOCK_BUCKET_SIZE), int(TX_HASH_PREFIX_LEN))
+    )
 
     cluster.shutdown()
 
