@@ -95,7 +95,12 @@ class EthStreamerAdapter:
         logs = exporter.get_items('log')
         return receipts, logs
 
-    def export_traces(self, start_block, end_block, genesis_traces=False):
+    def export_traces(
+            self,
+            start_block,
+            end_block,
+            include_genesis_traces=False,
+            include_daofork_traces=False):
         exporter = InMemoryItemExporter(item_types=['trace'])
         job = ExportTracesJob(
             start_block=start_block,
@@ -104,7 +109,8 @@ class EthStreamerAdapter:
             web3=ThreadLocalProxy(lambda: Web3(self.batch_web3_provider)),
             max_workers=self.max_workers,
             item_exporter=exporter,
-            include_genesis_traces=genesis_traces,
+            include_genesis_traces=include_genesis_traces,
+            include_daofork_traces=include_daofork_traces
         )
         job.run()
         traces = exporter.get_items('trace')
@@ -356,7 +362,7 @@ def main():
         blocks, txs = adapter.export_blocks_and_transactions(
              block_id, current_end_block)
         receipts, _ = adapter.export_receipts_and_logs(txs)
-        traces = adapter.export_traces(block_id, current_end_block, True)
+        traces = adapter.export_traces(block_id, current_end_block, True, True)
 
         # filter traces relevent for balance calculation
         filtered_traces = [elem for elem in traces
