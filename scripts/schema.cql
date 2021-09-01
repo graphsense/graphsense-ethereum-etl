@@ -74,26 +74,6 @@ CREATE TABLE trace (
     PRIMARY KEY (block_id_group, block_id, trace_id)
 );
 
-CREATE TABLE receipt (
-    transaction_hash_prefix text,
-    transaction_hash blob,
-    transaction_index smallint,
-    block_hash blob,
-    block_id int,
-    cumulative_gas_used bigint,
-    gas_used bigint,
-    contract_address blob,
-    root blob, // 32 bytes of post-transaction stateroot - pre Byzantium, before block 4_370_000
-    status smallint, // either 1 (success) or 0 (failure) - post Byzantium
-    PRIMARY KEY (transaction_hash_prefix, transaction_hash)
-);
-
-CREATE TABLE genesis_transfer (
-    address_id int,
-    address blob PRIMARY KEY,
-    value varint
-);
-
 CREATE TABLE exchange_rates (
     date text PRIMARY KEY,
     fiat_values map<text, float>
