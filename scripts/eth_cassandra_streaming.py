@@ -136,7 +136,7 @@ def get_last_ingested_block(session, keyspace):
     groups = [row.block_id_group for row in result.current_rows]
 
     if len(groups) == 0:
-        return 0
+        return None
 
     max_block_group = max(groups)
 
@@ -306,12 +306,9 @@ def create_parser():
                         type=int, default=100,
                         help='number of blocks to export at a time '
                              '(default 100)')
-    # parser.add_argument('--concurrency', dest='concurrency',
-    #                     type=int, default=100,
-    #                     help='Cassandra concurrency parameter (default 100)')
-    # parser.add_argument('--continue', action='store_true',
-    #                     dest='continue_ingest',
-    #                     help='continue ingest from last block')
+    parser.add_argument('-c', '--continue', action='store_true',
+                        dest='continue_ingest',
+                        help='continue ingest from last block')
     parser.add_argument('-d', '--db_nodes', dest='db_nodes', nargs='+',
                         default=['localhost'], metavar='DB_NODE',
                         help='list of Cassandra nodes; default "localhost")')
@@ -359,7 +356,11 @@ def main():
     last_synced_block = get_last_synced_block(thread_proxy)
     last_ingested_block = get_last_ingested_block(session, args.keyspace)
     print(f'Last synced block: {last_synced_block:,}')
-    print(f'Last ingested block: {last_ingested_block:,}')
+    if last_ingested_block is None:
+        print(f'Last ingested block: None')
+    else:
+        print(f'Last ingested block: {last_ingested_block:,}')
+
     if args.info:
         cluster.shutdown()
         raise SystemExit(0)
@@ -367,7 +368,17 @@ def main():
     adapter = EthStreamerAdapter(thread_proxy, batch_size=50)
 
     start_block = args.start_block
+    if args.continue_ingest:
+        if last_ingested_block is None:
+            start_block = 0
+        else:
+            start_block = last_ingested_block + 1
+
     end_block = last_synced_block if args.end_block is None else args.end_block
+
+    if start_block > end_block:
+        print("No blocks to ingest.")
+        raise SystemExit(0)
 
     time1 = datetime.now()
     count = 0
@@ -395,9 +406,9 @@ def main():
         enriched_txs = enrich_transactions(txs, receipts)
 
         # ingest into Cassandra
-        ingest_blocks(blocks, session, 'block', BLOCK_BUCKET_SIZE)
-        ingest_txs(enriched_txs, session, 'transaction', TX_HASH_PREFIX_LEN)
         ingest_traces(filtered_traces, session, 'trace', BLOCK_BUCKET_SIZE)
+        ingest_txs(enriched_txs, session, 'transaction', TX_HASH_PREFIX_LEN)
+        ingest_blocks(blocks, session, 'block', BLOCK_BUCKET_SIZE)
 
         count += args.batch_size
 
