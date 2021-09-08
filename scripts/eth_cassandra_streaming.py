@@ -175,30 +175,19 @@ def cassandra_ingest(session, prepared_stmt, parameters, concurrency=100):
             continue
 
 
-def ingest_blocks(items, session, table='block', block_bucket_size=100_000):
-    columns = [
-        'block_id_group',
-        'block_id',
-        'block_hash',
-        'parent_hash',
-        'nonce',
-        'sha3_uncles',
-        'logs_bloom',
-        'transactions_root',
-        'state_root',
-        'receipts_root',
-        'miner',
-        'difficulty',
-        'total_difficulty',
-        'size',
-        'extra_data',
-        'gas_limit',
-        'gas_used',
-        'timestamp',
-        'transaction_count'
-    ]
+def get_prepared_statement(session, keyspace, table):
+    cql_str = f'''SELECT column_name FROM system_schema.columns
+                  WHERE keyspace_name = \'{keyspace}\'
+                  AND table_name = \'{table}\';'''
+    result_set = session.execute(cql_str)
+    columns = [elem.column_name for elem in result_set._current_rows]
     cql_str = build_cql_insert_stmt(columns, table)
     prepared_stmt = session.prepare(cql_str)
+    return prepared_stmt
+
+
+def ingest_blocks(items, session, prepared_stmt, block_bucket_size=100_000):
+
     blob_colums = ['block_hash', 'parent_hash', 'nonce', 'sha3_uncles',
                    'logs_bloom', 'transactions_root', 'state_root',
                    'receipts_root', 'miner', 'extra_data']
@@ -216,33 +205,7 @@ def ingest_blocks(items, session, table='block', block_bucket_size=100_000):
     cassandra_ingest(session, prepared_stmt, items)
 
 
-def ingest_txs(items, session, table='transaction', tx_hash_prefix_len=4):
-    columns = [
-        'tx_hash_prefix',
-        'tx_hash',
-        'nonce',
-        'transaction_index',
-        'from_address',
-        'to_address',
-        'value',
-        'gas',
-        'gas_price',
-        'input',
-        'block_timestamp',
-        'block_id',
-        'block_hash',
-        'max_fee_per_gas',
-        'max_priority_fee_per_gas',
-        'transaction_type',
-        'receipt_cumulative_gas_used',
-        'receipt_gas_used',
-        'receipt_contract_address',
-        'receipt_root',
-        'receipt_status',
-        'receipt_effective_gas_price'
-    ]
-    cql_str = build_cql_insert_stmt(columns, table)
-    prepared_stmt = session.prepare(cql_str)
+def ingest_txs(items, session, prepared_stmt, tx_hash_prefix_len=4):
     blob_colums = ['tx_hash', 'from_address', 'to_address', 'input',
                    'block_hash', 'receipt_contract_address', 'receipt_root']
     for item in items:
@@ -259,30 +222,8 @@ def ingest_txs(items, session, table='transaction', tx_hash_prefix_len=4):
     cassandra_ingest(session, prepared_stmt, items)
 
 
-def ingest_traces(items, session, table='trace', block_bucket_size=100_000):
-    columns = [
-        'block_id_group',
-        'block_id',
-        'trace_id',
-        'tx_hash',
-        'transaction_index',
-        'from_address',
-        'to_address',
-        'value',
-        'input',
-        'output',
-        'trace_type',
-        'call_type',
-        'reward_type',
-        'gas',
-        'gas_used',
-        'subtraces',
-        'trace_address',
-        'error',
-        'status',
-    ]
-    cql_str = build_cql_insert_stmt(columns, table)
-    prepared_stmt = session.prepare(cql_str)
+def ingest_traces(items, session, prepared_stmt, block_bucket_size=100_000):
+
     blob_colums = ['tx_hash', 'from_address', 'to_address', 'input', 'output']
     for item in items:
         # remove column
@@ -389,6 +330,9 @@ def main():
 
     excluded_call_types = ['delegatecall', 'callcode', 'staticcall']
 
+    prep_stmt = {elem: get_prepared_statement(session, args.keyspace, elem)
+                 for elem in ['trace', 'transaction', 'block']}
+
     for block_id in range(start_block, end_block + 1, args.batch_size):
 
         current_end_block = min(end_block, block_id + args.batch_size - 1)
@@ -406,9 +350,21 @@ def main():
         enriched_txs = enrich_transactions(txs, receipts)
 
         # ingest into Cassandra
-        ingest_traces(filtered_traces, session, 'trace', BLOCK_BUCKET_SIZE)
-        ingest_txs(enriched_txs, session, 'transaction', TX_HASH_PREFIX_LEN)
-        ingest_blocks(blocks, session, 'block', BLOCK_BUCKET_SIZE)
+        ingest_traces(
+            filtered_traces,
+            session,
+            prep_stmt['trace'],
+            BLOCK_BUCKET_SIZE)
+        ingest_txs(
+            enriched_txs,
+            session,
+            prep_stmt['transaction'],
+            TX_HASH_PREFIX_LEN)
+        ingest_blocks(
+            blocks,
+            session,
+            prep_stmt['block'],
+            BLOCK_BUCKET_SIZE)
 
         count += args.batch_size
 
@@ -421,7 +377,7 @@ def main():
             time1 = time2
             count = 0
 
-    print(f'[{datetime.now().isoformat()}] Processed block range '
+    print(f'[{datetime.now()}] Processed block range '
           f'{start_block:,}:{end_block:,}')
 
     # store configuration details
