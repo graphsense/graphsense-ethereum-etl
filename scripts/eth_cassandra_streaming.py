@@ -298,7 +298,7 @@ def main():
     last_ingested_block = get_last_ingested_block(session, args.keyspace)
     print(f'Last synced block: {last_synced_block:,}')
     if last_ingested_block is None:
-        print(f'Last ingested block: None')
+        print('Last ingested block: None')
     else:
         print(f'Last ingested block: {last_ingested_block:,}')
 
@@ -318,7 +318,7 @@ def main():
     end_block = last_synced_block if args.end_block is None else args.end_block
 
     if start_block > end_block:
-        print("No blocks to ingest.")
+        print('No blocks to ingest')
         raise SystemExit(0)
 
     time1 = datetime.now()
