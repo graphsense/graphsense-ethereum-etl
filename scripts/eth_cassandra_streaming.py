@@ -149,6 +149,17 @@ def get_last_ingested_block(session, keyspace):
     return max_block
 
 
+def get_prepared_statement(session, keyspace, table):
+    cql_str = f'''SELECT column_name FROM system_schema.columns
+                  WHERE keyspace_name = \'{keyspace}\'
+                  AND table_name = \'{table}\';'''
+    result_set = session.execute(cql_str)
+    columns = [elem.column_name for elem in result_set._current_rows]
+    cql_str = build_cql_insert_stmt(columns, table)
+    prepared_stmt = session.prepare(cql_str)
+    return prepared_stmt
+
+
 def cassandra_ingest(session, prepared_stmt, parameters, concurrency=100):
     while True:
         try:
@@ -173,17 +184,6 @@ def cassandra_ingest(session, prepared_stmt, parameters, concurrency=100):
             print(exception)
             time.sleep(1)
             continue
-
-
-def get_prepared_statement(session, keyspace, table):
-    cql_str = f'''SELECT column_name FROM system_schema.columns
-                  WHERE keyspace_name = \'{keyspace}\'
-                  AND table_name = \'{table}\';'''
-    result_set = session.execute(cql_str)
-    columns = [elem.column_name for elem in result_set._current_rows]
-    cql_str = build_cql_insert_stmt(columns, table)
-    prepared_stmt = session.prepare(cql_str)
-    return prepared_stmt
 
 
 def ingest_blocks(items, session, prepared_stmt, block_bucket_size=100_000):
