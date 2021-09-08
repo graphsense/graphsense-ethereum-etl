@@ -3,6 +3,7 @@
 
 from argparse import ArgumentParser
 from datetime import datetime
+import time
 
 from cassandra.cluster import Cluster
 from cassandra.concurrent import execute_concurrent_with_args
@@ -149,19 +150,29 @@ def get_last_ingested_block(session, keyspace):
 
 
 def cassandra_ingest(session, prepared_stmt, parameters, concurrency=100):
-    results = execute_concurrent_with_args(
-        session=session,
-        statement=prepared_stmt,
-        parameters=parameters,
-        concurrency=concurrency)
-    for (i, (success, _)) in enumerate(results):
-        if not success:
-            try:
-                session.execute(prepared_stmt, parameters[i])
-            except Exception as e:
-                print(e)
-                continue
+    while True:
+        try:
+            results = execute_concurrent_with_args(
+                session=session,
+                statement=prepared_stmt,
+                parameters=parameters,
+                concurrency=concurrency)
+
+            for (i, (success, _)) in enumerate(results):
+                if not success:
+                    while True:
+                        try:
+                            session.execute(prepared_stmt, parameters[i])
+                        except Exception as exception:
+                            print(exception)
+                            continue
+                        break
             break
+
+        except Exception as exception:
+            print(exception)
+            time.sleep(1)
+            continue
 
 
 def ingest_blocks(items, session, table='block', block_bucket_size=100_000):
