@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""ethereum-etl streaming adapter.
+
+   Ingests blocks, transaction/receipts and traces into Apache Cassandra.
+"""
 
 from argparse import ArgumentParser
 from datetime import datetime
 import time
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, PreparedStatement, Session
 from cassandra.concurrent import execute_concurrent_with_args
 from ethereumetl.jobs.export_blocks_job import ExportBlocksJob
 from ethereumetl.jobs.export_receipts_job import ExportReceiptsJob
@@ -19,34 +24,47 @@ from ethereumetl.thread_local_proxy import ThreadLocalProxy
 from web3 import Web3
 
 
-class InMemoryItemExporter:
-    def __init__(self, item_types):
-        self.item_types = item_types
-        self.items = {}
+BLOCK_BUCKET_SIZE = 100_000
+TX_HASH_PREFIX_LEN = 4
 
-    def open(self):
+
+class InMemoryItemExporter:
+    """In-memory item exporter for EthStreamerAdapter export jobs."""
+
+    def __init__(self, item_types: Iterable) -> None:
+        self.item_types = item_types
+        self.items: Dict[str, List] = {}
+
+    def open(self) -> None:
+        """Open item exporter."""
         for item_type in self.item_types:
             self.items[item_type] = []
 
-    def export_item(self, item):
+    def export_item(self, item) -> None:
+        """Export single item."""
         item_type = item.get('type', None)
         if item_type is None:
             raise ValueError(f'type key is not found in item {item}')
         self.items[item_type].append(item)
 
-    def close(self):
-        pass
+    def close(self) -> None:
+        """Close item exporter."""
 
-    def get_items(self, item_type):
+    def get_items(self, item_type) -> Iterable:
+        """Get items from exporter."""
         return self.items[item_type]
 
 
 class EthStreamerAdapter:
+    """Ethereum streaming adapter to export blocks, transactions,
+       receipts, logs amd traces."""
+
     def __init__(
             self,
-            batch_web3_provider,
-            batch_size=190,
-            max_workers=5):
+            batch_web3_provider: ThreadLocalProxy,
+            batch_size: int = 100,
+            max_workers: int = 5
+           ) -> None:
         self.batch_web3_provider = batch_web3_provider
         self.batch_size = batch_size
         self.max_workers = max_workers
@@ -55,10 +73,13 @@ class EthStreamerAdapter:
 
     def export_blocks_and_transactions(
             self,
-            start_block,
-            end_block,
-            export_blocks=True,
-            export_transactions=True):
+            start_block: int,
+            end_block: int,
+            export_blocks: bool = True,
+            export_transactions: bool = True
+           ) -> Tuple[Iterable, Iterable]:
+        """Export blocks and transactions for specified block range."""
+
         blocks_and_transactions_item_exporter = \
             InMemoryItemExporter(item_types=['block', 'transaction'])
         blocks_and_transactions_job = ExportBlocksJob(
@@ -77,7 +98,12 @@ class EthStreamerAdapter:
             .get_items('transaction')
         return blocks, transactions
 
-    def export_receipts_and_logs(self, transactions):
+    def export_receipts_and_logs(
+            self,
+            transactions: Iterable
+           ) -> Tuple[Iterable, Iterable]:
+        """Export receipts and logs for specified transaction hashes."""
+
         exporter = InMemoryItemExporter(item_types=['receipt', 'log'])
         job = ExportReceiptsJob(
             transaction_hashes_iterable=(
@@ -97,10 +123,13 @@ class EthStreamerAdapter:
 
     def export_traces(
             self,
-            start_block,
-            end_block,
-            include_genesis_traces=False,
-            include_daofork_traces=False):
+            start_block: int,
+            end_block: int,
+            include_genesis_traces: bool = False,
+            include_daofork_traces: bool = False
+           ) -> Iterable[Dict]:
+        """Export traces for specified block range."""
+
         exporter = InMemoryItemExporter(item_types=['trace'])
         job = ExportTracesJob(
             start_block=start_block,
@@ -117,20 +146,31 @@ class EthStreamerAdapter:
         return traces
 
 
-def hex_to_bytearray(hex_str):
+def hex_to_bytearray(hex_str: str) -> Optional[bytearray]:
+    """Convert hexstring (starting with 0x) to bytearray."""
+
     return bytearray.fromhex(hex_str[2:]) if hex_str is not None else None
 
 
-def build_cql_insert_stmt(columns, table):
+def build_cql_insert_stmt(columns: Sequence[str], table: str) -> str:
+    """Create CQL insert statement for specified columns and table name."""
+
     return 'INSERT INTO %s (%s) VALUES (%s);' % \
         (table, ', '.join(columns), ('?,' * len(columns))[:-1])
 
 
-def get_last_synced_block(batch_web3_provider):
+def get_last_synced_block(batch_web3_provider: ThreadLocalProxy) -> int:
+    """Return last synchronized block from Ethereum client."""
+
     return int(Web3(batch_web3_provider).eth.getBlock('latest').number)
 
 
-def get_last_ingested_block(session, keyspace):
+def get_last_ingested_block(
+        session: Session,
+        keyspace: str
+       ) -> Optional[int]:
+    """Return last ingested block ID from block table."""
+
     result = session.execute(
         f'SELECT block_id_group FROM {keyspace}.block PER PARTITION LIMIT 1')
     groups = [row.block_id_group for row in result.current_rows]
@@ -149,7 +189,13 @@ def get_last_ingested_block(session, keyspace):
     return max_block
 
 
-def get_prepared_statement(session, keyspace, table):
+def get_prepared_statement(
+        session: Session,
+        keyspace: str,
+        table: str
+       ) -> PreparedStatement:
+    """Build prepared CQL INSERT statement for specified table."""
+
     cql_str = f'''SELECT column_name FROM system_schema.columns
                   WHERE keyspace_name = \'{keyspace}\'
                   AND table_name = \'{table}\';'''
@@ -160,7 +206,14 @@ def get_prepared_statement(session, keyspace, table):
     return prepared_stmt
 
 
-def cassandra_ingest(session, prepared_stmt, parameters, concurrency=100):
+def cassandra_ingest(
+        session: Session,
+        prepared_stmt: PreparedStatement,
+        parameters,
+        concurrency: int = 100
+       ) -> None:
+    """Concurrent ingest into Apache Cassandra."""
+
     while True:
         try:
             results = execute_concurrent_with_args(
@@ -186,7 +239,13 @@ def cassandra_ingest(session, prepared_stmt, parameters, concurrency=100):
             continue
 
 
-def ingest_blocks(items, session, prepared_stmt, block_bucket_size=100_000):
+def ingest_blocks(
+        items: Iterable,
+        session: Session,
+        prepared_stmt: PreparedStatement,
+        block_bucket_size: int = 100_000
+       ) -> None:
+    """Ingest blocks into Apache Cassandra."""
 
     blob_colums = ['block_hash', 'parent_hash', 'nonce', 'sha3_uncles',
                    'logs_bloom', 'transactions_root', 'state_root',
@@ -205,7 +264,14 @@ def ingest_blocks(items, session, prepared_stmt, block_bucket_size=100_000):
     cassandra_ingest(session, prepared_stmt, items)
 
 
-def ingest_txs(items, session, prepared_stmt, tx_hash_prefix_len=4):
+def ingest_transactions(
+        items: Iterable,
+        session: Session,
+        prepared_stmt: PreparedStatement,
+        tx_hash_prefix_len: int = 4
+       ) -> None:
+    """Ingest transactions into Apache Cassandra."""
+
     blob_colums = ['tx_hash', 'from_address', 'to_address', 'input',
                    'block_hash', 'receipt_contract_address', 'receipt_root']
     for item in items:
@@ -222,7 +288,13 @@ def ingest_txs(items, session, prepared_stmt, tx_hash_prefix_len=4):
     cassandra_ingest(session, prepared_stmt, items)
 
 
-def ingest_traces(items, session, prepared_stmt, block_bucket_size=100_000):
+def ingest_traces(
+        items: Iterable,
+        session: Session,
+        prepared_stmt: PreparedStatement,
+        block_bucket_size: int = 100_000
+       ) -> None:
+    """Ingest traces into Apache Cassandra."""
 
     blob_colums = ['tx_hash', 'from_address', 'to_address', 'input', 'output']
     for item in items:
@@ -240,6 +312,8 @@ def ingest_traces(items, session, prepared_stmt, block_bucket_size=100_000):
 
 
 def create_parser():
+    """Create command-line argument parser."""
+
     parser = ArgumentParser(
         description='ethereum-etl ingest into Apache Cassandra',
         epilog='GraphSense - http://graphsense.info')
@@ -278,13 +352,10 @@ def create_parser():
     return parser
 
 
-def main():
+def main() -> None:
 
     parser = create_parser()
     args = parser.parse_args()
-
-    BLOCK_BUCKET_SIZE = 100_000
-    TX_HASH_PREFIX_LEN = 4
 
     thread_proxy = ThreadLocalProxy(
         lambda: get_provider_from_uri(
@@ -355,7 +426,7 @@ def main():
             session,
             prep_stmt['trace'],
             BLOCK_BUCKET_SIZE)
-        ingest_txs(
+        ingest_transactions(
             enriched_txs,
             session,
             prep_stmt['transaction'],
