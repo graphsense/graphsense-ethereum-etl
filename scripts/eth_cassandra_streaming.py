@@ -302,6 +302,10 @@ def create_parser():
     parser = ArgumentParser(
         description='ethereum-etl ingest into Apache Cassandra',
         epilog='GraphSense - http://graphsense.info')
+    parser.add_argument('-b', '--batch-size', dest='batch_size',
+                        type=int, default=100,
+                        help='number of blocks to export at a time '
+                             '(default 100)')
     # parser.add_argument('--concurrency', dest='concurrency',
     #                     type=int, default=100,
     #                     help='Cassandra concurrency parameter (default 100)')
@@ -330,6 +334,9 @@ def create_parser():
     parser.add_argument('-e', '--end-block', dest='end_block',
                         type=int, default=None,
                         help='end block (default: last available block)')
+    parser.add_argument('-t', '--timeout', dest='timeout',
+                        type=int, default=3600,
+                        help='Web3 API timeout in seconds (default: 3600s')
     return parser
 
 
@@ -343,7 +350,7 @@ def main():
 
     thread_proxy = ThreadLocalProxy(
         lambda: get_provider_from_uri(
-                    args.provider_uri, timeout=180, batch=True)
+                    args.provider_uri, timeout=args.timeout, batch=True)
     )
 
     cluster = Cluster(args.db_nodes)
@@ -362,8 +369,6 @@ def main():
     start_block = args.start_block
     end_block = last_synced_block if args.end_block is None else args.end_block
 
-    BATCH_SIZE = 10
-
     time1 = datetime.now()
     count = 0
 
@@ -373,9 +378,9 @@ def main():
 
     excluded_call_types = ['delegatecall', 'callcode', 'staticcall']
 
-    for block_id in range(start_block, end_block + 1, BATCH_SIZE):
+    for block_id in range(start_block, end_block + 1, args.batch_size):
 
-        current_end_block = min(end_block, block_id + BATCH_SIZE - 1)
+        current_end_block = min(end_block, block_id + args.batch_size - 1)
 
         blocks, txs = adapter.export_blocks_and_transactions(
              block_id, current_end_block)
@@ -394,7 +399,7 @@ def main():
         ingest_txs(enriched_txs, session, 'transaction', TX_HASH_PREFIX_LEN)
         ingest_traces(filtered_traces, session, 'trace', BLOCK_BUCKET_SIZE)
 
-        count += BATCH_SIZE
+        count += args.batch_size
 
         if count % 1000 == 0:
             time2 = datetime.now()
