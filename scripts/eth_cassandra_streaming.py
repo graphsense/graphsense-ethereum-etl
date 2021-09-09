@@ -413,16 +413,11 @@ def main() -> None:
         receipts, _ = adapter.export_receipts_and_logs(txs)
         traces = adapter.export_traces(block_id, current_end_block, True, True)
 
-        # filter traces relevant for balance calculation
-        filtered_traces = [elem for elem in traces
-                           if (elem['status'] == 1) and
-                              (not elem['call_type'] or
-                               elem['call_type'] not in excluded_call_types)]
         enriched_txs = enrich_transactions(txs, receipts)
 
         # ingest into Cassandra
         ingest_traces(
-            filtered_traces,
+            traces,
             session,
             prep_stmt['trace'],
             BLOCK_BUCKET_SIZE)
