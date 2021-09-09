@@ -304,6 +304,8 @@ def ingest_traces(
         item['tx_hash'] = item.pop('transaction_hash')
         item['block_id'] = item.pop('block_number')
         item['block_id_group'] = item['block_id'] // block_bucket_size
+        item['trace_address'] = ','.join(str(item['trace_address'])) \
+            if item['trace_address'] is not None else None
         # convert hex strings to byte arrays (blob in Cassandra)
         for elem in blob_colums:
             item[elem] = hex_to_bytearray(item[elem])
