@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """ethereum-etl streaming adapter.
 
-   Ingests blocks, transaction/receipts and traces into Apache Cassandra.
+   Ingest blocks, transactions/receipts and traces into Apache Cassandra.
 """
 
 from argparse import ArgumentParser
