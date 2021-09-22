@@ -244,6 +244,23 @@ def cassandra_ingest(
             continue
 
 
+def ingest_configuration(
+    session: Session,
+    keyspace: str,
+    block_bucket_size: int,
+    tx_hash_prefix_len: int,
+) -> None:
+    """Store configuration details in Cassandra table."""
+
+    cql_str = """INSERT INTO configuration
+                 (id, block_bucket_size, tx_prefix_length)
+                 VALUES (%s, %s, %s)"""
+    session.execute(
+        cql_str,
+        (keyspace, int(block_bucket_size), int(tx_hash_prefix_len)),
+    )
+
+
 def ingest_blocks(
     items: Iterable,
     session: Session,
@@ -421,10 +438,20 @@ def create_parser():
     return parser
 
 
-def main() -> None:
+def print_block_info(last_synced_block: int, last_ingested_block: int) -> None:
+    """Display information about number of synced/ingested blocks."""
 
-    parser = create_parser()
-    args = parser.parse_args()
+    print(f"Last synced block: {last_synced_block:,}")
+    if last_ingested_block is None:
+        print("Last ingested block: None")
+    else:
+        print(f"Last ingested block: {last_ingested_block:,}")
+
+
+def main() -> None:
+    """main function."""
+
+    args = create_parser().parse_args()
 
     thread_proxy = ThreadLocalProxy(
         lambda: get_provider_from_uri(
@@ -437,11 +464,7 @@ def main() -> None:
 
     last_synced_block = get_last_synced_block(thread_proxy)
     last_ingested_block = get_last_ingested_block(session, args.keyspace)
-    print(f"Last synced block: {last_synced_block:,}")
-    if last_ingested_block is None:
-        print("Last ingested block: None")
-    else:
-        print(f"Last ingested block: {last_ingested_block:,}")
+    print_block_info(last_synced_block, last_ingested_block)
 
     if args.info:
         cluster.shutdown()
@@ -514,12 +537,8 @@ def main() -> None:
     )
 
     # store configuration details
-    cql_str = """INSERT INTO configuration
-                 (id, block_bucket_size, tx_prefix_length)
-                 VALUES (%s, %s, %s)"""
-    session.execute(
-        cql_str,
-        (args.keyspace, int(BLOCK_BUCKET_SIZE), int(TX_HASH_PREFIX_LEN)),
+    ingest_configuration(
+        session, args.keyspace, int(BLOCK_BUCKET_SIZE), int(TX_HASH_PREFIX_LEN)
     )
 
     cluster.shutdown()
