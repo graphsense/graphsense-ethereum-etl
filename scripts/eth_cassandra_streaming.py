@@ -6,7 +6,7 @@
 """
 
 from argparse import ArgumentParser
-from datetime import datetime
+from datetime import datetime, timezone
 import time
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -166,8 +166,29 @@ def build_cql_insert_stmt(columns: Sequence[str], table: str) -> str:
     )
 
 
+def get_last_block_yesterday(batch_web3_provider: ThreadLocalProxy) -> int:
+    """Return last block number of previous day from Ethereum client."""
+
+    block = Web3(batch_web3_provider).eth.getBlock("latest")
+    until_date = datetime.utcnow().replace(
+        hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc
+    )
+    until_timestamp = until_date.timestamp()
+
+    print(
+        f"Determining latest block before {until_date.isoformat()}: ",
+        end="",
+        flush=True,
+    )
+    while block["timestamp"] >= until_timestamp:
+        block = Web3(batch_web3_provider).eth.getBlock(block["parentHash"])
+    block_number = block["number"]
+    print(f"{block_number:,}")
+    return block_number
+
+
 def get_last_synced_block(batch_web3_provider: ThreadLocalProxy) -> int:
-    """Return last synchronized block from Ethereum client."""
+    """Return last synchronized block number from Ethereum client."""
 
     return int(Web3(batch_web3_provider).eth.getBlock("latest").number)
 
@@ -399,11 +420,15 @@ def create_parser():
         required=True,
         help="Cassandra keyspace",
     )
-    # parser.add_argument('-p', '--previous_day', dest='prev_day',
-    #                     action='store_true',
-    #                     help='only ingest blocks up to the previous day, '
-    #                          'since currency exchange rates might not be '
-    #                          'available for the current day')
+    parser.add_argument(
+        "-p",
+        "--previous_day",
+        dest="prev_day",
+        action="store_true",
+        help="only ingest blocks up to the previous day, "
+        "since currency exchange rates might not be "
+        "available for the current day",
+    )
     parser.add_argument(
         "-w",
         "--web3-provider-uri",
@@ -480,6 +505,9 @@ def main() -> None:
             start_block = last_ingested_block + 1
 
     end_block = last_synced_block if args.end_block is None else args.end_block
+
+    if args.prev_day:
+        end_block = get_last_block_yesterday(thread_proxy)
 
     if start_block > end_block:
         print("No blocks to ingest")
