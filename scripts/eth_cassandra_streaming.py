@@ -451,7 +451,7 @@ def create_parser():
         dest="timeout",
         type=int,
         default=3600,
-        help="Web3 API timeout in seconds (default: 3600s",
+        help="Web3 API timeout in seconds (default: 3600s)",
     )
     return parser
 
