@@ -1,4 +1,4 @@
-# A dockerised component to synchronize Ethereum ETL data to Apache Cassandra
+# A GraphSense component to synchronize Ethereum ETL data to Apache Cassandra
 
 ## Prerequisites
 ### Apache Cassandra
@@ -20,51 +20,43 @@ and test if it is running
 
     (1 rows)
 
-## Docker setup
+## Local setup
 
-Build the docker image
+Create and activate a python environment for required dependencies
+([ethereum-etl][ethereum-etl] and
+[Python client driver for Apache Cassandra][python-cassandra]).
 
-    docker-compose build
+    python3 -m venv venv
+    . venv/bin/activate
 
-This image includes the patched version of [Ethereum ETL][ethereum-etl] and
-the [Datastax bulk loader][dsbulk].
+Install dependencies in local environment
 
-## Ingesting Ethereum blocks and transactions
-
-Start a shell
-
-    docker-compose run graphsense-ethereum-etl /bin/bash
+    pip install -r requirements.txt
 
 Starting on a freshly installed database, first create a keyspace
 
     create_keyspace.py -d $CASSANDRA_HOST -k $KEYSPACE -s /opt/graphsense/schema.cql
 
-Then start the ingest. If data exists from a previous ingest, the process
-will continue from the latest block.
+Then start the data ingest. If data exists from a previous ingest, the process
+will continue from the latest block id found in the `block` table:
 
-    eth_ingest.py -d $CASSANDRA_HOST -k $KEYSPACE -u yesterday
+    eth_cassandra_streaming.py -d $CASSANDRA_HOST -k $KEYSPACE -w $PROVIDER_URI -p
 
-To ingest specific block ranges, for block and/or transaction table:
-
-    eth_ingest.py -d $CASSANDRA_HOST -k $KEYSPACE -p $PROVIDER_URI -t block:46147-46150 transaction:46127-46200
+To ingest specific block ranges use the `-s`/`--startblock` and
+`-e`/`--end_block` options (see `eth_cassandra_streaming.py -h`).
 
 Provider URIs might be in the form of
 
 ```
 PROVIDER_URI=http://127.0.0.1:8545
-PROVIDER_URI=file:///home/gethuser/.ethereum/geth.ipc
+PROVIDER_URI=file:///opt/openethereum/jsonrpc.ipc
 ```
 
-## Exchange rates
+Ethereum exchange rates are obtained through [CoinMarketCap][coinmarketcap].
+See `scripts/ingest_rates_coinmarketcap.py`.
 
-For Ethereum the exchange rates are obtained through [CoinMarketCap][coinmarketcap]:
-
-    ~/pandas-venv/bin/python3 /usr/local/bin/ingest_rates_coinmarketcap.py -d $CASSANDRA_HOST -k $KEYSPACE
-
-
-For additional options, see `scripts/ingest_rates_coinmarketcap.py`.
 
 [ethereum-etl]: https://github.com/graphsense/ethereum-etl
-[dsbulk]: https://github.com/datastax/dsbulk
 [apache-cassandra]: http://cassandra.apache.org/download
+[python-cassandra]: https://github.com/datastax/python-driver
 [coinmarketcap]: https://coinmarketcap.com
