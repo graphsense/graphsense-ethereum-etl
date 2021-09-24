@@ -376,7 +376,7 @@ def ingest_traces(
     cassandra_ingest(session, prepared_stmt, items)
 
 
-def create_parser():
+def create_parser() -> ArgumentParser:
     """Create command-line argument parser."""
 
     parser = ArgumentParser(
@@ -456,7 +456,9 @@ def create_parser():
     return parser
 
 
-def print_block_info(last_synced_block: int, last_ingested_block: int) -> None:
+def print_block_info(
+    last_synced_block: int, last_ingested_block: Optional[int]
+) -> None:
     """Display information about number of synced/ingested blocks."""
 
     print(f"Last synced block: {last_synced_block:,}")
@@ -467,7 +469,7 @@ def print_block_info(last_synced_block: int, last_ingested_block: int) -> None:
 
 
 def main() -> None:
-    """main function."""
+    """Main function."""
 
     args = create_parser().parse_args()
 
