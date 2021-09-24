@@ -74,11 +74,12 @@ def query_most_recent_date(
         max_date = (
             rates.nlargest(1, "date").iloc[0]["date"].strftime("%Y-%m-%d")
         )
-
     return max_date
 
 
-def fetch_cmc_rates(start: str, end: str, crypto_currency: str) -> pd.DataFrame:
+def fetch_cmc_rates(
+    start: str, end: str, crypto_currency: str
+) -> pd.DataFrame:
     """Fetch cryptocurrency exchange rates from CoinMarketCap."""
 
     user_agent = (
@@ -137,8 +138,8 @@ def create_parser() -> ArgumentParser:
         "--force",
         dest="force",
         action="store_true",
-        help="do not fetch most recent entries from "
-        "Cassandra and overwrite existing records",
+        help="don't continue from last found Cassandra record "
+        "and force overwrite of existing rows",
     )
     parser.add_argument(
         "--fiat-currencies",
@@ -146,7 +147,7 @@ def create_parser() -> ArgumentParser:
         nargs="+",
         default=["USD", "EUR"],
         metavar="FIAT_CURRENCY",
-        help="list of fiat currencies; " + "default ['USD', 'EUR']",
+        help="list of fiat currencies; default ['USD', 'EUR']",
     )
     parser.add_argument(
         "-k",
@@ -249,14 +250,17 @@ def main() -> None:
     # insert final exchange rates into Cassandra
     if "USD" not in args.fiat_currencies:
         exchange_rates.drop("USD", axis=1, inplace=True)
-    exchange_rates["fiat_values"] = exchange_rates.drop("date", axis=1).to_dict(
-        orient="records"
-    )
+    exchange_rates["fiat_values"] = exchange_rates.drop(
+        "date", axis=1
+    ).to_dict(orient="records")
     exchange_rates.drop(args.fiat_currencies, axis=1, inplace=True)
 
+    print(f"{exchange_rates.iloc[0].date} - {exchange_rates.iloc[-1].date}")
+
+    # insert exchange rates into Cassandra table
+    insert_exchange_rates(session, args.keyspace, args.table, exchange_rates)
     print(f"Inserted rates for {len(exchange_rates)} days: ", end="")
     print(f"{exchange_rates.iloc[0].date} - {exchange_rates.iloc[-1].date}")
-    insert_exchange_rates(session, args.keyspace, args.table, exchange_rates)
 
     cluster.shutdown()
 
