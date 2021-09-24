@@ -214,12 +214,21 @@ def main():
     fx_rates = fetch_fx_rates(args.fiat_currencies)
     # query conversion rates and merge converted values in exchange rates
     exchange_rates = crypto_df
+
+    date_range = pd.date_range(
+        date.fromisoformat(start), date.fromisoformat(end)
+    )
+    date_range = pd.DataFrame(date_range, columns=["date"])
+    date_range = date_range["date"].dt.strftime("%Y-%m-%d")
+
     for fiat_currency in set(args.fiat_currencies) - set(["USD"]):
         fx_df = fx_rates[["date", fiat_currency]].rename(
             columns={fiat_currency: "fx_rate"}
         )
-        merged_df = crypto_df.merge(fx_df, how="left", on="date")
-        merged_df["fx_rate"].interpolate(method="linear", inplace=True)
+        merged_df = crypto_df.merge(fx_df, on="date", how="left").merge(
+            date_range, how="right"
+        )
+        # fill gaps over weekends
         merged_df["fx_rate"].fillna(method="ffill", inplace=True)
         merged_df["fx_rate"].fillna(method="bfill", inplace=True)
         merged_df[fiat_currency] = merged_df["USD"] * merged_df["fx_rate"]
