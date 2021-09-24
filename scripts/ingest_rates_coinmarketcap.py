@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
-# coding: utf-8
-"""Script to fetch cryptocurrency exchange rates from CoinMarketCap"""
+# -*- coding: utf-8 -*-
+"""Script to fetch cryptocurrency exchange rates from CoinMarketCap."""
 
 from argparse import ArgumentParser
 from datetime import date, datetime, timedelta
 import json
+from typing import List, Optional
 
-from cassandra.cluster import Cluster
+from cassandra.cluster import Cluster, Session
 import pandas as pd
 import requests
 
+MIN_START = "2015-01-01"
+FX_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.zip"
 
-def fetch_fx_rates(symbol_list):
+
+def fetch_ecb_rates(symbol_list: List) -> pd.DataFrame:
     """Fetch and preprocess FX rates from ECB."""
 
-    FX_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.zip"
     print(f"Fetching conversion rates for FIAT currencies:\n{FX_URL}")
     rates_eur = pd.read_csv(FX_URL)  # exchange rates based on EUR
     rates_eur = rates_eur.iloc[:, :-1]  # remove empty last column
@@ -26,7 +29,8 @@ def fetch_fx_rates(symbol_list):
     return rates_usd
 
 
-def historical_coin_url(symbol, start, end):
+def cmc_historical_url(symbol: str, start: date, end: date) -> str:
+    """Returns URL for CoinMarketCap API request."""
     return (
         "https://web-api.coinmarketcap.com/v1/cryptocurrency/ohlcv/"
         + f"historical?symbol={symbol}&convert=USD"
@@ -34,8 +38,10 @@ def historical_coin_url(symbol, start, end):
     )
 
 
-def parse_historical_coin_response(response):
-    """Parse historical exchange rates (JSON) from CoinMarketCap"""
+def parse_cmc_historical_response(
+    response: requests.Response,
+) -> pd.DataFrame:
+    """Parse historical exchange rates (JSON) from CoinMarketCap."""
 
     json_data = json.loads(response.content)
     json_data = [
@@ -46,7 +52,9 @@ def parse_historical_coin_response(response):
     return pd.DataFrame(json_data, columns=["date", "USD"])
 
 
-def query_most_recent_date(session, keyspace, table):
+def query_most_recent_date(
+    session: Session, keyspace: str, table: str
+) -> Optional[str]:
     """Fetch most recent entry from exchange rates table."""
 
     def pandas_factory(colnames, rows):
@@ -57,17 +65,22 @@ def query_most_recent_date(session, keyspace, table):
     query = f"""SELECT date FROM {keyspace}.{table};"""
 
     result = session.execute(query)
-    df = result._current_rows
-    if df.empty:
-        return None
-    df["date"] = df["date"].astype("datetime64")
+    rates = result._current_rows
 
-    largest = df.nlargest(1, "date").iloc[0]["date"]
+    if rates.empty:
+        max_date = None
+    else:
+        rates["date"] = rates["date"].astype("datetime64")
+        max_date = (
+            rates.nlargest(1, "date").iloc[0]["date"].strftime("%Y-%m-%d")
+        )
 
-    return largest.strftime("%Y-%m-%d")
+    return max_date
 
 
-def fetch_crypto_exchange_rates(start, end, crypto_currency):
+def fetch_cmc_rates(
+    start: str, end: str, crypto_currency: str
+) -> pd.DataFrame:
     """Fetch cryptocurrency exchange rates from CoinMarketCap."""
 
     user_agent = (
@@ -79,32 +92,33 @@ def fetch_crypto_exchange_rates(start, end, crypto_currency):
 
     start_date = date.fromisoformat(start) + timedelta(days=-1)
     end_date = date.fromisoformat(end)
-    url = historical_coin_url(crypto_currency, start_date, end_date)
+    url = cmc_historical_url(crypto_currency, start_date, end_date)
 
-    print(f"Fetching {crypto_currency} exchange rates\n{url}")
+    print(f"Fetching {crypto_currency} exchange rates:\n{url}")
     response = requests.get(url, headers=headers)
-    df = parse_historical_coin_response(response)
+    cmc_rates = parse_cmc_historical_response(response)
 
-    print(f"Last record: {df.date.tolist()[-1]}")
-    return df
+    print(f"Last record: {cmc_rates.date.tolist()[-1]}")
+    return cmc_rates
 
 
-def insert_exchange_rates(session, keyspace, table, exchange_rates_df):
+def insert_exchange_rates(
+    session: Session, keyspace: str, table: str, exchange_rates: pd.DataFrame
+) -> None:
     """Insert exchange rates into Cassandra table."""
 
-    colnames = ",".join(exchange_rates_df.columns)
-    values = ",".join(["?" for i in range(len(exchange_rates_df.columns))])
+    colnames = ",".join(exchange_rates.columns)
+    values = ",".join(["?" for i in range(len(exchange_rates.columns))])
     query = f"""INSERT INTO {keyspace}.{table}({colnames}) VALUES ({values})"""
     prepared = session.prepare(query)
 
-    for _, row in exchange_rates_df.iterrows():
+    for _, row in exchange_rates.iterrows():
         session.execute(prepared, row)
 
 
-def main():
+def main() -> None:
     """Main function."""
 
-    MIN_START = "2015-01-01"
     prev_date = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
 
     parser = ArgumentParser(
@@ -113,12 +127,12 @@ def main():
     )
     parser.add_argument(
         "-d",
-        "--db_nodes",
+        "--db-nodes",
         dest="db_nodes",
         nargs="+",
         default=["localhost"],
         metavar="DB_NODE",
-        help='list of Cassandra nodes; default "localhost"',
+        help="list of Cassandra nodes; default 'localhost'",
     )
     parser.add_argument(
         "-f",
@@ -129,12 +143,12 @@ def main():
         "Cassandra and overwrite existing records",
     )
     parser.add_argument(
-        "--fiat_currencies",
+        "--fiat-currencies",
         dest="fiat_currencies",
         nargs="+",
         default=["USD", "EUR"],
         metavar="FIAT_CURRENCY",
-        help="list of fiat fiat currencies;" + 'default ["USD", "EUR"]',
+        help="list of fiat currencies; " + "default ['USD', 'EUR']",
     )
     parser.add_argument(
         "-k",
@@ -151,15 +165,15 @@ def main():
         help="name of the target exchange rate table",
     )
     parser.add_argument(
-        "--start_date",
-        dest="start",
+        "--start-date",
+        dest="start_date",
         type=str,
         default=MIN_START,
         help="start date for fetching exchange rates",
     )
     parser.add_argument(
-        "--end_date",
-        dest="end",
+        "--end-date",
+        dest="end_date",
         type=str,
         default=prev_date,
         help="end date for fetching exchange rates",
@@ -176,56 +190,50 @@ def main():
     args = parser.parse_args()
 
     cluster = Cluster(args.db_nodes)
-    keyspace = args.keyspace
-    table = args.table
-    session = cluster.connect(keyspace)
+    session = cluster.connect(args.keyspace)
 
-    crypto_currency = args.cryptocurrency
+    # default start and end date
+    start_date = args.start_date
+    end_date = args.end_date
 
-    # Default start and end date
-    start = args.start
-    end = args.end
-
-    print(f"*** Starting exchange rate ingest for {crypto_currency} ***")
-
-    if datetime.fromisoformat(start) < datetime.fromisoformat(MIN_START):
-        start = MIN_START
+    if datetime.fromisoformat(start_date) < datetime.fromisoformat(MIN_START):
+        start_date = MIN_START
 
     # query most recent data
     if not args.force:
-        most_recent_date = query_most_recent_date(session, keyspace, table)
+        most_recent_date = query_most_recent_date(
+            session, args.keyspace, args.table
+        )
         if most_recent_date is not None:
-            start = most_recent_date
+            start_date = most_recent_date
 
-    print(f"Start date: {start}")
-    print(f"End date: {end}")
+    print(f"*** Starting exchange rate ingest for {args.cryptocurrency} ***")
+    print(f"Start date: {start_date}")
+    print(f"End date: {end_date}")
+    print(f"Target fiat currencies: {args.fiat_currencies}")
 
-    if datetime.fromisoformat(start) > datetime.fromisoformat(end):
+    if datetime.fromisoformat(start_date) > datetime.fromisoformat(end_date):
         print("Error: start date after end date.")
         cluster.shutdown()
         raise SystemExit
 
-    # query all required fiat currencies
-    print(f"Target fiat currencies: {args.fiat_currencies}")
+    # fetch cryptocurrency exchange rates in USD
+    cmc_rates = fetch_cmc_rates(start_date, end_date, args.cryptocurrency)
 
-    # fetch crypto currency exchange rates in USD
-    crypto_df = fetch_crypto_exchange_rates(start, end, crypto_currency)
-
-    fx_rates = fetch_fx_rates(args.fiat_currencies)
+    ecb_rates = fetch_ecb_rates(args.fiat_currencies)
     # query conversion rates and merge converted values in exchange rates
-    exchange_rates = crypto_df
-
+    exchange_rates = cmc_rates
     date_range = pd.date_range(
-        date.fromisoformat(start), date.fromisoformat(end)
+        date.fromisoformat(start_date), date.fromisoformat(end_date)
     )
     date_range = pd.DataFrame(date_range, columns=["date"])
     date_range = date_range["date"].dt.strftime("%Y-%m-%d")
 
     for fiat_currency in set(args.fiat_currencies) - set(["USD"]):
-        fx_df = fx_rates[["date", fiat_currency]].rename(
+        ecb_rate = ecb_rates[["date", fiat_currency]].rename(
             columns={fiat_currency: "fx_rate"}
         )
-        merged_df = crypto_df.merge(fx_df, on="date", how="left").merge(
+        merged_df = cmc_rates.merge(ecb_rate, on="date", how="left").merge(
             date_range, how="right"
         )
         # fill gaps over weekends
@@ -243,8 +251,9 @@ def main():
     ).to_dict(orient="records")
     exchange_rates.drop(args.fiat_currencies, axis=1, inplace=True)
 
-    print(f"Inserted rates for {len(exchange_rates)} days")
-    insert_exchange_rates(session, keyspace, table, exchange_rates)
+    print(f"Inserted rates for {len(exchange_rates)} days: ", end="")
+    print(f"{exchange_rates.iloc[0].date} - {exchange_rates.iloc[-1].date}")
+    insert_exchange_rates(session, args.keyspace, args.table, exchange_rates)
 
     cluster.shutdown()
 
