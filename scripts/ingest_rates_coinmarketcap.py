@@ -78,9 +78,7 @@ def query_most_recent_date(
     return max_date
 
 
-def fetch_cmc_rates(
-    start: str, end: str, crypto_currency: str
-) -> pd.DataFrame:
+def fetch_cmc_rates(start: str, end: str, crypto_currency: str) -> pd.DataFrame:
     """Fetch cryptocurrency exchange rates from CoinMarketCap."""
 
     user_agent = (
@@ -116,8 +114,8 @@ def insert_exchange_rates(
         session.execute(prepared, row)
 
 
-def main() -> None:
-    """Main function."""
+def create_parser() -> ArgumentParser:
+    """Create command-line argument parser."""
 
     prev_date = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
 
@@ -186,8 +184,13 @@ def main() -> None:
         required=True,
         help="target cryptocurrency",
     )
+    return parser
 
-    args = parser.parse_args()
+
+def main() -> None:
+    """Main function."""
+
+    args = create_parser().parse_args()
 
     cluster = Cluster(args.db_nodes)
     session = cluster.connect(args.keyspace)
@@ -246,9 +249,9 @@ def main() -> None:
     # insert final exchange rates into Cassandra
     if "USD" not in args.fiat_currencies:
         exchange_rates.drop("USD", axis=1, inplace=True)
-    exchange_rates["fiat_values"] = exchange_rates.drop(
-        "date", axis=1
-    ).to_dict(orient="records")
+    exchange_rates["fiat_values"] = exchange_rates.drop("date", axis=1).to_dict(
+        orient="records"
+    )
     exchange_rates.drop(args.fiat_currencies, axis=1, inplace=True)
 
     print(f"Inserted rates for {len(exchange_rates)} days: ", end="")
