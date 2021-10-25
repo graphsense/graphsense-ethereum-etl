@@ -388,8 +388,8 @@ def create_parser() -> ArgumentParser:
         "--batch-size",
         dest="batch_size",
         type=int,
-        default=100,
-        help="number of blocks to export at a time " "(default 100)",
+        default=10,
+        help="number of blocks to export at a time (default: 10)",
     )
     parser.add_argument(
         "-d",
@@ -398,7 +398,7 @@ def create_parser() -> ArgumentParser:
         nargs="+",
         default=["localhost"],
         metavar="DB_NODE",
-        help="list of Cassandra nodes; default 'localhost')",
+        help="list of Cassandra nodes; default: 'localhost')",
     )
     parser.add_argument(
         "-i",
