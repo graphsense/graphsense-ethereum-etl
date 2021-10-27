@@ -58,7 +58,7 @@ Ethereum exchange rates are obtained through [CoinMarketCap][coinmarketcap].
 See `scripts/ingest_rates_coinmarketcap.py`.
 
 
-[ethereum-etl]: https://github.com/graphsense/ethereum-etl
+[ethereum-etl]: https://github.com/blockchain-etl/ethereum-etl
 [apache-cassandra]: http://cassandra.apache.org/download
 [python-cassandra]: https://github.com/datastax/python-driver
 [coinmarketcap]: https://coinmarketcap.com
