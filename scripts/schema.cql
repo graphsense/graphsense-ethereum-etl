@@ -42,7 +42,7 @@ CREATE TABLE transaction (
     max_fee_per_gas bigint,
     max_priority_fee_per_gas bigint,
     transaction_type bigint,
-    receipt_cumulative_gas_used bigint,
+    receipt_cumulative_gas_used varint,
     receipt_gas_used varint,
     receipt_contract_address blob,
     receipt_root blob,
