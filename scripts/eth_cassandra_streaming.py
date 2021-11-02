@@ -25,7 +25,7 @@ from ethereumetl.thread_local_proxy import ThreadLocalProxy
 from web3 import Web3
 
 
-BLOCK_BUCKET_SIZE = 100_000
+BLOCK_BUCKET_SIZE = 1_000
 TX_HASH_PREFIX_LEN = 4
 
 
@@ -286,7 +286,7 @@ def ingest_blocks(
     items: Iterable,
     session: Session,
     prepared_stmt: PreparedStatement,
-    block_bucket_size: int = 100_000,
+    block_bucket_size: int = 1_000,
 ) -> None:
     """Ingest blocks into Apache Cassandra."""
 
@@ -352,7 +352,7 @@ def ingest_traces(
     items: Iterable,
     session: Session,
     prepared_stmt: PreparedStatement,
-    block_bucket_size: int = 100_000,
+    block_bucket_size: int = 1_000,
 ) -> None:
     """Ingest traces into Apache Cassandra."""
 
