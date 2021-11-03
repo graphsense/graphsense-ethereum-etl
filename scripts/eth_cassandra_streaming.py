@@ -12,8 +12,10 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 from cassandra.cluster import (
     Cluster,
-    PreparedStatement,
     Session,
+)
+from cassandra.query import (
+    PreparedStatement,
     SimpleStatement,
 )
 from cassandra.concurrent import execute_concurrent_with_args
