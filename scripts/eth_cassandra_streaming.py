@@ -10,7 +10,12 @@ from datetime import datetime, timezone
 import time
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
-from cassandra.cluster import Cluster, PreparedStatement, Session
+from cassandra.cluster import (
+    Cluster,
+    PreparedStatement,
+    Session,
+    SimpleStatement,
+)
 from cassandra.concurrent import execute_concurrent_with_args
 from ethereumetl.jobs.export_blocks_job import ExportBlocksJob
 from ethereumetl.jobs.export_receipts_job import ExportReceiptsJob
@@ -196,9 +201,11 @@ def get_last_synced_block(batch_web3_provider: ThreadLocalProxy) -> int:
 def get_last_ingested_block(session: Session, keyspace: str) -> Optional[int]:
     """Return last ingested block ID from block table."""
 
-    result = session.execute(
+    cql_str = (
         f"SELECT block_id_group FROM {keyspace}.block PER PARTITION LIMIT 1"
     )
+    simple_stmt = SimpleStatement(cql_str, fetch_size=None)
+    result = session.execute(simple_stmt)
     groups = [row.block_id_group for row in result.current_rows]
 
     if len(groups) == 0:
