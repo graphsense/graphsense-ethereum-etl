@@ -14,11 +14,11 @@ from cassandra.cluster import (
     Cluster,
     Session,
 )
+from cassandra.concurrent import execute_concurrent_with_args
 from cassandra.query import (
     PreparedStatement,
     SimpleStatement,
 )
-from cassandra.concurrent import execute_concurrent_with_args
 from ethereumetl.jobs.export_blocks_job import ExportBlocksJob
 from ethereumetl.jobs.export_receipts_job import ExportReceiptsJob
 from ethereumetl.jobs.export_traces_job import ExportTracesJob
