@@ -20,6 +20,7 @@ CREATE TABLE block (
     extra_data blob,
     gas_limit int,
     gas_used int,
+    base_fee_per_gas bigint,
     timestamp int,
     transaction_count smallint,
     PRIMARY KEY (block_id_group, block_id)
