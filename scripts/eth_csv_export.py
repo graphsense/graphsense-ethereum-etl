@@ -307,8 +307,8 @@ def format_traces(
 def write_csv(
     filename: str, data: Iterable, header: Iterable, delimiter: str = ","
 ) -> None:
-
     """Write list of dicts to compresses CSV file."""
+
     with gzip.open(filename, "wt") as csv_file:
         csv_writer = DictWriter(
             csv_file, delimiter=delimiter, fieldnames=header
@@ -428,6 +428,7 @@ def main() -> None:
         start_block = args.start_block
 
     end_block = get_last_synced_block(thread_proxy)
+    print(f"Last synced block: {end_block:,}")
     if args.end_block is not None:
         end_block = args.end_block
     if args.prev_day:
