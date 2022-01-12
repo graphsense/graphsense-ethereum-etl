@@ -10,6 +10,7 @@ from csv import DictWriter
 from datetime import datetime, timezone
 import gzip
 import pathlib
+import re
 from typing import Dict, Iterable, List, Tuple
 
 from ethereumetl.jobs.export_blocks_job import ExportBlocksJob
@@ -332,6 +333,13 @@ def create_parser() -> ArgumentParser:
         help="number of blocks to export from client at a time (default: 10)",
     )
     parser.add_argument(
+        "-c",
+        "--continue",
+        dest="continue_export",
+        action="store_true",
+        help="continue from export from position",
+    )
+    parser.add_argument(
         "-d",
         "--directory",
         dest="dir",
@@ -343,6 +351,13 @@ def create_parser() -> ArgumentParser:
         type=int,
         default=1000,
         help="number of blocks to export to a CSV file (default: 1000)",
+    )
+    parser.add_argument(
+        "--partition-batch-size",
+        dest="partition_batch_size",
+        type=int,
+        default=1_000_000,
+        help="number of blocks to export in partition (default: 1_000_000)",
     )
     parser.add_argument(
         "-p",
@@ -400,8 +415,15 @@ def main() -> None:
 
     adapter = EthStreamerAdapter(thread_proxy, batch_size=50)
 
+    start_block = 0
     if args.start_block is None:
-        start_block = 0
+        if args.continue_export:
+            block_files = sorted(pathlib.Path(args.dir).rglob("block*"))
+            if block_files:
+                last_file = block_files[-1].name
+                start_block = (
+                    int(re.match(r".*-(\d+)", last_file).group(1)) + 1
+                )
     else:
         start_block = args.start_block
 
@@ -415,14 +437,19 @@ def main() -> None:
     count = 0
 
     block_bucket_size = args.file_batch_size
-    if args.file_batch_size < args.batch_size:
-        print("Error: file_batch_size < batch_size")
+    if args.file_batch_size % args.batch_size != 0:
+        print("Error: file_batch_size is not a multiple of batch_size")
+        raise SystemExit(1)
+    if args.partition_batch_size % args.file_batch_size != 0:
+        print(
+            "Error: partition_batch_size is not a multiple of file_batch_size"
+        )
         raise SystemExit(1)
 
     rounded_start_block = start_block // block_bucket_size * block_bucket_size
     rounded_end_block = (
-        (end_block + 1) // block_bucket_size * block_bucket_size - 1
-    )
+        end_block + 1
+    ) // block_bucket_size * block_bucket_size - 1
 
     if rounded_start_block > rounded_end_block:
         print("No blocks to export")
@@ -440,9 +467,9 @@ def main() -> None:
         print(exception)
         raise SystemExit(1) from exception
 
-    block_file = path / ("block_%08d-%08d.csv.gz" % block_range)
-    tx_file = path / ("tx_%08d-%08d.csv.gz" % block_range)
-    trace_file = path / ("trace_%08d-%08d.csv.gz" % block_range)
+    block_file = "block_%08d-%08d.csv.gz" % block_range
+    tx_file = "tx_%08d-%08d.csv.gz" % block_range
+    trace_file = "trace_%08d-%08d.csv.gz" % block_range
 
     print(
         f"[{time1}] Processing block range "
@@ -485,22 +512,28 @@ def main() -> None:
 
         if (block_id + args.batch_size) % block_bucket_size == 0:
             time3 = datetime.now()
+            partition_start = block_id - (block_id % args.partition_batch_size)
+            partition_end = partition_start + args.partition_batch_size - 1
+            sub_dir = f"{partition_start:08d}-{partition_end:08d}"
+            full_path = path / sub_dir
+            full_path.mkdir(parents=True, exist_ok=True)
+
+            write_csv(full_path / trace_file, trace_list, TRACE_HEADER)
+            write_csv(full_path / tx_file, tx_list, TX_HEADER)
+            write_csv(full_path / block_file, block_list, BLOCK_HEADER)
+
             print(
                 f"[{time3}] "
-                f"Exporting blocks: {block_range[0]:,}:{block_range[1]:,} "
+                f"Exported blocks: {block_range[0]:,}:{block_range[1]:,} "
             )
-
-            write_csv(trace_file, trace_list, TRACE_HEADER)
-            write_csv(tx_file, tx_list, TX_HEADER)
-            write_csv(block_file, block_list, BLOCK_HEADER)
 
             block_range = (
                 block_id + args.batch_size,
                 block_id + args.batch_size + block_bucket_size - 1,
             )
-            block_file = path / ("block_%08d-%08d.csv.gz" % block_range)
-            tx_file = path / ("tx_%08d-%08d.csv.gz" % block_range)
-            trace_file = path / ("trace_%08d-%08d.csv.gz" % block_range)
+            block_file = "block_%08d-%08d.csv.gz" % block_range
+            tx_file = "tx_%08d-%08d.csv.gz" % block_range
+            trace_file = "trace_%08d-%08d.csv.gz" % block_range
 
             block_list.clear()
             tx_list.clear()
