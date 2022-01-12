@@ -421,6 +421,7 @@ def main() -> None:
             block_files = sorted(pathlib.Path(args.dir).rglob("block*"))
             if block_files:
                 last_file = block_files[-1].name
+                print(f"Last exported file: {block_files[-1]}")
                 start_block = (
                     int(re.match(r".*-(\d+)", last_file).group(1)) + 1
                 )
