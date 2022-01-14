@@ -200,12 +200,11 @@ def get_last_synced_block(batch_web3_provider: ThreadLocalProxy) -> int:
     return int(Web3(batch_web3_provider).eth.getBlock("latest").number)
 
 
-def get_last_ingested_block(session: Session, keyspace: str) -> Optional[int]:
+def get_last_ingested_block(session: Session, table="block") -> Optional[int]:
     """Return last ingested block ID from block table."""
 
-    cql_str = (
-        f"SELECT block_id_group FROM {keyspace}.block PER PARTITION LIMIT 1"
-    )
+    cql_str = f"""SELECT block_id_group FROM {session.keyspace}.{table}
+                  PER PARTITION LIMIT 1"""
     simple_stmt = SimpleStatement(cql_str, fetch_size=None)
     result = session.execute(simple_stmt)
     groups = [row.block_id_group for row in result.current_rows]
@@ -216,8 +215,7 @@ def get_last_ingested_block(session: Session, keyspace: str) -> Optional[int]:
     max_block_group = max(groups)
 
     result = session.execute(
-        f"""SELECT MAX(block_id) AS max_block
-            FROM {keyspace}.block
+        f"""SELECT MAX(block_id) AS max_block FROM {session.keyspace}.{table}
             WHERE block_id_group={max_block_group}"""
     )
     max_block = result.current_rows[0].max_block
@@ -492,7 +490,7 @@ def main() -> None:
     session = cluster.connect(args.keyspace)
 
     last_synced_block = get_last_synced_block(thread_proxy)
-    last_ingested_block = get_last_ingested_block(session, args.keyspace)
+    last_ingested_block = get_last_ingested_block(session)
     print_block_info(last_synced_block, last_ingested_block)
 
     if args.info:
