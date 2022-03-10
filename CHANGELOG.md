@@ -3,6 +3,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.5.2] 2022-03-10
+### Changed
+- Updated Python dependencies
+- Minor improvements
+
 ## [0.5.1] 2021-11-29
 ### Changed
 - Use streaming adapter interface for data ingest into Cassandra
