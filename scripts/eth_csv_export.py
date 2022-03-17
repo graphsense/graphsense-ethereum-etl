@@ -93,6 +93,7 @@ TRACE_HEADER = [
     "error",
     "status",
     "trace_id",
+    "trace_index",
     "tx_hash",
     "block_id",
     "block_id_group",
@@ -497,7 +498,7 @@ def main() -> None:
         enriched_txs = enrich_transactions(txs, receipts)
 
         block_list.extend(format_blocks(blocks))
-        tx_list.extend(format_transactions(enriched_txs))
+        tx_list.extend(format_transactions(enriched_txs, TX_HASH_PREFIX_LEN))
         trace_list.extend(format_traces(traces))
 
         count += args.batch_size

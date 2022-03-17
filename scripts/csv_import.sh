@@ -24,4 +24,5 @@ dsbulk load -c csv -h "$DB_HOST" -k "$DB_KEYSPACE" -t trace -url "$DIR" \
     --connector.csv.fileNamePattern '**/trace_*.csv.gz' \
     --connector.csv.compression gzip \
     --connector.csv.recursive true \
+    --schema.allowMissingFields true \
     --connector.csv.maxCharsPerColumn=-1
