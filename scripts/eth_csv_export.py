@@ -26,7 +26,7 @@ from ethereumetl.thread_local_proxy import ThreadLocalProxy
 from web3 import Web3
 
 
-TX_HASH_PREFIX_LEN = 4
+TX_HASH_PREFIX_LEN = 5
 
 BLOCK_HEADER = [
     "parent_hash",

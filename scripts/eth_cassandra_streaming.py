@@ -33,7 +33,7 @@ from web3 import Web3
 
 
 BLOCK_BUCKET_SIZE = 1_000
-TX_HASH_PREFIX_LEN = 4
+TX_HASH_PREFIX_LEN = 5
 
 
 class InMemoryItemExporter:
