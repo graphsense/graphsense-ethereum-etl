@@ -26,7 +26,7 @@ from ethereumetl.thread_local_proxy import ThreadLocalProxy
 from web3 import Web3
 
 
-TX_HASH_PREFIX_LEN = 4
+TX_HASH_PREFIX_LEN = 5
 
 BLOCK_HEADER = [
     "parent_hash",
@@ -94,6 +94,19 @@ TRACE_HEADER = [
     "status",
     "trace_id",
     "trace_index",
+    "tx_hash",
+    "block_id",
+    "block_id_group",
+]
+
+LOGS_HEADER = [
+    "log_index",
+    "transaction_index",
+    "block_hash",
+    "address",
+    "transaction_hash",
+    "data",
+    "topics",
     "tx_hash",
     "block_id",
     "block_id_group",
@@ -188,7 +201,7 @@ class EthStreamerAdapter:
             max_workers=self.max_workers,
             item_exporter=exporter,
             export_receipts=True,
-            export_logs=False,
+            export_logs=True,
         )
 
         job.run()
@@ -299,6 +312,28 @@ def format_traces(
         item["trace_address"] = (
             "|".join(map(str, item["trace_address"]))
             if item["trace_address"] is not None
+            else None
+        )
+
+    return items
+
+
+def format_logs(
+    items: Iterable,
+    block_bucket_size: int = 1_000,
+) -> None:
+    """Format logs."""
+
+    for item in items:
+        # remove column
+        item.pop("type")
+        # rename/add columns
+        item["tx_hash"] = item.pop("transaction_hash")
+        item["block_id"] = item.pop("block_number")
+        item["block_id_group"] = item["block_id"] // block_bucket_size
+        item["topics"] = (
+            "|".join(map(str, item["topics"]))
+            if item["topics"] is not None
             else None
         )
 
@@ -473,6 +508,7 @@ def main() -> None:
     block_file = "block_%08d-%08d.csv.gz" % block_range
     tx_file = "tx_%08d-%08d.csv.gz" % block_range
     trace_file = "trace_%08d-%08d.csv.gz" % block_range
+    logs_file = "logs_%08d-%08d.csv.gz" % block_range
 
     print(
         f"[{time1}] Processing block range "
@@ -482,6 +518,7 @@ def main() -> None:
     block_list = []
     tx_list = []
     trace_list = []
+    logs_list = []
 
     for block_id in range(
         rounded_start_block, rounded_end_block + 1, args.batch_size
@@ -492,14 +529,14 @@ def main() -> None:
         blocks, txs = adapter.export_blocks_and_transactions(
             block_id, current_end_block
         )
-        receipts, _ = adapter.export_receipts_and_logs(txs)
+        receipts, logs = adapter.export_receipts_and_logs(txs)
         traces = adapter.export_traces(block_id, current_end_block, True, True)
-
         enriched_txs = enrich_transactions(txs, receipts)
 
         block_list.extend(format_blocks(blocks))
         tx_list.extend(format_transactions(enriched_txs, TX_HASH_PREFIX_LEN))
         trace_list.extend(format_traces(traces))
+        logs_list.extend(format_logs(logs))
 
         count += args.batch_size
 
@@ -524,6 +561,7 @@ def main() -> None:
             write_csv(full_path / trace_file, trace_list, TRACE_HEADER)
             write_csv(full_path / tx_file, tx_list, TX_HEADER)
             write_csv(full_path / block_file, block_list, BLOCK_HEADER)
+            write_csv(full_path / logs_file, logs_list, LOGS_HEADER)
 
             print(
                 f"[{time3}] "
@@ -537,10 +575,12 @@ def main() -> None:
             block_file = "block_%08d-%08d.csv.gz" % block_range
             tx_file = "tx_%08d-%08d.csv.gz" % block_range
             trace_file = "trace_%08d-%08d.csv.gz" % block_range
+            logs_file = "logs_%08d-%08d.csv.gz" % block_range
 
             block_list.clear()
             tx_list.clear()
             trace_list.clear()
+            logs_list.clear()
 
     print(
         f"[{datetime.now()}] Processed block range "

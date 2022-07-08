@@ -72,7 +72,8 @@ CREATE TABLE trace (
     error text,
     status smallint,
     trace_id text,
-    PRIMARY KEY (block_id_group, block_id, trace_id)
+    trace_index int,
+    PRIMARY KEY (block_id_group, block_id, trace_index)
 );
 
 CREATE TABLE exchange_rates (
