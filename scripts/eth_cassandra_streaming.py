@@ -6,7 +6,7 @@
 """
 
 from argparse import ArgumentParser
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import time
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -23,6 +23,7 @@ from ethereumetl.jobs.export_blocks_job import ExportBlocksJob
 from ethereumetl.jobs.export_receipts_job import ExportReceiptsJob
 from ethereumetl.jobs.export_traces_job import ExportTracesJob
 from ethereumetl.providers.auto import get_provider_from_uri
+from ethereumetl.service.eth_service import EthService
 from ethereumetl.streaming.enrich import enrich_transactions
 from ethereumetl.streaming.eth_item_id_calculator import EthItemIdCalculator
 from ethereumetl.streaming.eth_item_timestamp_calculator import (
@@ -176,22 +177,21 @@ def build_cql_insert_stmt(columns: Sequence[str], table: str) -> str:
 def get_last_block_yesterday(batch_web3_provider: ThreadLocalProxy) -> int:
     """Return last block number of previous day from Ethereum client."""
 
-    block = Web3(batch_web3_provider).eth.getBlock("latest")
-    until_date = datetime.utcnow().replace(
+    web3 = Web3(batch_web3_provider)
+    eth_service = EthService(web3)
+
+    date = datetime.utcnow().replace(
         hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc
     )
-    until_timestamp = until_date.timestamp()
-
     print(
-        f"Determining latest block before {until_date.isoformat()}: ",
+        f"Determining latest block before {date.isoformat()}: ",
         end="",
         flush=True,
     )
-    while block["timestamp"] >= until_timestamp:
-        block = Web3(batch_web3_provider).eth.getBlock(block["parentHash"])
-    block_number = block["number"]
-    print(f"{block_number:,}")
-    return block_number
+    prev_date = datetime.date(datetime.today()) - timedelta(days=1)
+    _, end_block = eth_service.get_block_range_for_date(prev_date)
+    print(f"{end_block:,}")
+    return end_block
 
 
 def get_last_synced_block(batch_web3_provider: ThreadLocalProxy) -> int:

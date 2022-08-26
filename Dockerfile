@@ -1,5 +1,5 @@
 FROM alpine:3.11
-LABEL maintainer="contact@graphsense.info"
+LABEL maintainer="contact@iknaio.com"
 
 
 ARG USER=dockeruser
