@@ -15,10 +15,7 @@ from cassandra.cluster import (
     Session,
 )
 from cassandra.concurrent import execute_concurrent_with_args
-from cassandra.query import (
-    PreparedStatement,
-    SimpleStatement,
-)
+from cassandra.query import PreparedStatement, SimpleStatement, UNSET_VALUE
 from ethereumetl.jobs.export_blocks_job import ExportBlocksJob
 from ethereumetl.jobs.export_receipts_job import ExportReceiptsJob
 from ethereumetl.jobs.export_traces_job import ExportTracesJob
@@ -31,10 +28,37 @@ from ethereumetl.streaming.eth_item_timestamp_calculator import (
 )
 from ethereumetl.thread_local_proxy import ThreadLocalProxy
 from web3 import Web3
+from typing import Union
 
 
 BLOCK_BUCKET_SIZE = 1_000
 TX_HASH_PREFIX_LEN = 5
+
+
+def none_to_unset(items: Union[dict, tuple, list]):
+    """ Sets all None value to UNSET 
+    See https://stackoverflow.com/questions/34637680/how-insert-in-cassandra-without-null-value-in-column
+    
+    Args:
+        items (Union[dict, tuple, list]): items to insert
+    
+    Returns:
+        None: -
+    
+    Raises:
+        Exception: If datatype of items is not supported (list,tuple,dict)
+    """
+    if type(items) == dict:
+        return {k: (UNSET_VALUE if v is None else v) for k, v in items.items()}
+    elif type(items) == tuple:
+        return tuple([UNSET_VALUE if v is None else v for v in list(items)])
+    elif type(items) == list:
+        return [(UNSET_VALUE if v is None else v) for v in items]
+    else:
+        raise Exception(
+            f"Can't auto unset for type {type(items)} please assign "
+            "cassandra.query.UNSET_VALUE manually."
+        )
 
 
 class InMemoryItemExporter:
@@ -105,9 +129,7 @@ class EthStreamerAdapter:
 
         blocks_and_transactions_job.run()
         blocks = blocks_and_transactions_item_exporter.get_items("block")
-        transactions = blocks_and_transactions_item_exporter.get_items(
-            "transaction"
-        )
+        transactions = blocks_and_transactions_item_exporter.get_items("transaction")
         return blocks, transactions
 
     def export_receipts_and_logs(
@@ -320,6 +342,8 @@ def ingest_blocks(
         for elem in blob_colums:
             item[elem] = hex_to_bytearray(item[elem])
 
+    items = [none_to_unset(row) for row in items]
+
     cassandra_ingest(session, prepared_stmt, items)
 
 
@@ -352,6 +376,8 @@ def ingest_transactions(
         for elem in blob_colums:
             item[elem] = hex_to_bytearray(item[elem])
 
+    items = [none_to_unset(row) for row in items]
+
     cassandra_ingest(session, prepared_stmt, items)
 
 
@@ -379,6 +405,8 @@ def ingest_traces(
         # convert hex strings to byte arrays (blob in Cassandra)
         for elem in blob_colums:
             item[elem] = hex_to_bytearray(item[elem])
+
+    items = [none_to_unset(row) for row in items]
 
     cassandra_ingest(session, prepared_stmt, items)
 
@@ -562,10 +590,7 @@ def main() -> None:
             time1 = time2
             count = 0
 
-    print(
-        f"[{datetime.now()}] Processed block range "
-        f"{start_block:,}:{end_block:,}"
-    )
+    print(f"[{datetime.now()}] Processed block range " f"{start_block:,}:{end_block:,}")
 
     # store configuration details
     ingest_configuration(
