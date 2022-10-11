@@ -36,15 +36,15 @@ TX_HASH_PREFIX_LEN = 5
 
 
 def none_to_unset(items: Union[dict, tuple, list]):
-    """ Sets all None value to UNSET 
+    """Sets all None value to UNSET
     See https://stackoverflow.com/questions/34637680/how-insert-in-cassandra-without-null-value-in-column
-    
+
     Args:
         items (Union[dict, tuple, list]): items to insert
-    
+
     Returns:
         None: -
-    
+
     Raises:
         Exception: If datatype of items is not supported (list,tuple,dict)
     """
@@ -129,7 +129,9 @@ class EthStreamerAdapter:
 
         blocks_and_transactions_job.run()
         blocks = blocks_and_transactions_item_exporter.get_items("block")
-        transactions = blocks_and_transactions_item_exporter.get_items("transaction")
+        transactions = blocks_and_transactions_item_exporter.get_items(
+            "transaction"
+        )
         return blocks, transactions
 
     def export_receipts_and_logs(
@@ -590,7 +592,10 @@ def main() -> None:
             time1 = time2
             count = 0
 
-    print(f"[{datetime.now()}] Processed block range " f"{start_block:,}:{end_block:,}")
+    print(
+        f"[{datetime.now()}] Processed block range "
+        f"{start_block:,}:{end_block:,}"
+    )
 
     # store configuration details
     ingest_configuration(
