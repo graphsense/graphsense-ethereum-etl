@@ -3,6 +3,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [22.10] 2022-10-11
+### Changed
+- Updated Python dependencies
+- Set `None` values to `UNSET` to avoid tombstones in Cassandra
+
 ## [1.0.1] 2022-08-26
 ### Changed
 - Updated Python dependencies
