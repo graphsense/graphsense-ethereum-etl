@@ -6,7 +6,7 @@ Exports blocks, transactions/receipts and traces to CSV files.
 """
 
 from argparse import ArgumentParser
-from csv import DictWriter
+from csv import DictWriter, QUOTE_NONE
 from datetime import datetime, timedelta, timezone
 import gzip
 import pathlib
@@ -101,16 +101,16 @@ TRACE_HEADER = [
 ]
 
 LOGS_HEADER = [
-    "log_index",
-    "transaction_index",
+    "block_id_group",
+    "block_id",
     "block_hash",
     "address",
-    "transaction_hash",
     "data",
     "topics",
+    "topic0",
     "tx_hash",
-    "block_id",
-    "block_id_group",
+    "log_index",
+    "transaction_index",
 ]
 
 
@@ -182,9 +182,7 @@ class EthStreamerAdapter:
 
         blocks_and_transactions_job.run()
         blocks = blocks_and_transactions_item_exporter.get_items("block")
-        transactions = blocks_and_transactions_item_exporter.get_items(
-            "transaction"
-        )
+        transactions = blocks_and_transactions_item_exporter.get_items("transaction")
         return blocks, transactions
 
     def export_receipts_and_logs(
@@ -331,24 +329,41 @@ def format_logs(
         item["tx_hash"] = item.pop("transaction_hash")
         item["block_id"] = item.pop("block_number")
         item["block_id_group"] = item["block_id"] // block_bucket_size
-        item["topics"] = (
-            "|".join(map(str, item["topics"]))
-            if item["topics"] is not None
-            else None
-        )
+
+        tpcs = item["topics"]
+
+        if tpcs is None:
+            tpcs = []
+
+        if "topic0" not in item:
+            item["topic0"] = tpcs[0] if len(tpcs) > 0 else None
+
+        qt = ",".join([f'"{t}"' for t in tpcs])
+
+        item["topics"] = f"[{qt}]"
+
+        if "transaction_hash" in item:
+            item.pop("transaction_hash")
 
     return items
 
 
 def write_csv(
-    filename: str, data: Iterable, header: Iterable, delimiter: str = ","
+    filename: str, data: Iterable, header: Iterable, delimiter: str = ",", quoting=None
 ) -> None:
     """Write list of dicts to compresses CSV file."""
 
     with gzip.open(filename, "wt") as csv_file:
-        csv_writer = DictWriter(
-            csv_file, delimiter=delimiter, fieldnames=header
-        )
+        if quoting is None:
+            csv_writer = DictWriter(csv_file, delimiter=delimiter, fieldnames=header)
+        else:
+            csv_writer = DictWriter(
+                csv_file,
+                delimiter=delimiter,
+                fieldnames=header,
+                quoting=quoting,
+                quotechar="",
+            )
         csv_writer.writeheader()
         for row in data:
             csv_writer.writerow(row)
@@ -458,9 +473,7 @@ def main() -> None:
             if block_files:
                 last_file = block_files[-1].name
                 print(f"Last exported file: {block_files[-1]}")
-                start_block = (
-                    int(re.match(r".*-(\d+)", last_file).group(1)) + 1
-                )
+                start_block = int(re.match(r".*-(\d+)", last_file).group(1)) + 1
     else:
         start_block = args.start_block
 
@@ -479,15 +492,11 @@ def main() -> None:
         print("Error: file_batch_size is not a multiple of batch_size")
         raise SystemExit(1)
     if args.partition_batch_size % args.file_batch_size != 0:
-        print(
-            "Error: partition_batch_size is not a multiple of file_batch_size"
-        )
+        print("Error: partition_batch_size is not a multiple of file_batch_size")
         raise SystemExit(1)
 
     rounded_start_block = start_block // block_bucket_size * block_bucket_size
-    rounded_end_block = (
-        end_block + 1
-    ) // block_bucket_size * block_bucket_size - 1
+    rounded_end_block = (end_block + 1) // block_bucket_size * block_bucket_size - 1
 
     if rounded_start_block > rounded_end_block:
         print("No blocks to export")
@@ -520,9 +529,7 @@ def main() -> None:
     trace_list = []
     logs_list = []
 
-    for block_id in range(
-        rounded_start_block, rounded_end_block + 1, args.batch_size
-    ):
+    for block_id in range(rounded_start_block, rounded_end_block + 1, args.batch_size):
 
         current_end_block = min(end_block, block_id + args.batch_size - 1)
 
@@ -561,11 +568,16 @@ def main() -> None:
             write_csv(full_path / trace_file, trace_list, TRACE_HEADER)
             write_csv(full_path / tx_file, tx_list, TX_HEADER)
             write_csv(full_path / block_file, block_list, BLOCK_HEADER)
-            write_csv(full_path / logs_file, logs_list, LOGS_HEADER)
+            write_csv(
+                full_path / logs_file,
+                logs_list,
+                LOGS_HEADER,
+                delimiter="|",
+                quoting=QUOTE_NONE,
+            )
 
             print(
-                f"[{time3}] "
-                f"Exported blocks: {block_range[0]:,}:{block_range[1]:,} "
+                f"[{time3}] " f"Exported blocks: {block_range[0]:,}:{block_range[1]:,} "
             )
 
             block_range = (

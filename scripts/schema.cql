@@ -86,3 +86,17 @@ CREATE TABLE configuration (
     block_bucket_size int,
     tx_prefix_length int
 );
+
+CREATE TABLE log (
+    block_id_group int,
+    block_id int,
+    block_hash blob,
+    address blob,
+    data blob,
+    topics list<blob>,
+    topic0 blob,
+    tx_hash blob,
+    log_index int,
+    transaction_index smallint,
+    PRIMARY KEY (block_id_group, block_id, topic0)
+) WITH CLUSTERING ORDER BY (block_id ASC);

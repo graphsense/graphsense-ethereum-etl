@@ -129,9 +129,7 @@ class EthStreamerAdapter:
 
         blocks_and_transactions_job.run()
         blocks = blocks_and_transactions_item_exporter.get_items("block")
-        transactions = blocks_and_transactions_item_exporter.get_items(
-            "transaction"
-        )
+        transactions = blocks_and_transactions_item_exporter.get_items("transaction")
         return blocks, transactions
 
     def export_receipts_and_logs(
@@ -149,7 +147,7 @@ class EthStreamerAdapter:
             max_workers=self.max_workers,
             item_exporter=exporter,
             export_receipts=True,
-            export_logs=False,
+            export_logs=True,
         )
 
         job.run()
@@ -269,7 +267,6 @@ def cassandra_ingest(
     concurrency: int = 100,
 ) -> None:
     """Concurrent ingest into Apache Cassandra."""
-
     while True:
         try:
             results = execute_concurrent_with_args(
@@ -311,6 +308,50 @@ def ingest_configuration(
         cql_str,
         (keyspace, int(block_bucket_size), int(tx_hash_prefix_len)),
     )
+
+
+def ingest_logs(
+    items: Iterable,
+    session: Session,
+    prepared_stmt: PreparedStatement,
+    block_bucket_size: int = 1_000,
+) -> None:
+    """Ingest blocks into Apache Cassandra."""
+
+    blob_colums = [
+        "block_hash",
+        "address",
+        "data",
+        "topic0",
+        "tx_hash",
+    ]
+    for item in items:
+        # remove column
+        item.pop("type")
+        # rename/add columns
+        item["tx_hash"] = item.pop("transaction_hash")
+        item["block_id"] = item.pop("block_number")
+        item["block_id_group"] = item["block_id"] // block_bucket_size
+
+        tpcs = item["topics"]
+
+        if tpcs is None:
+            tpcs = []
+
+        if "topic0" not in item:
+            item["topic0"] = tpcs[0] if len(tpcs) > 0 else None
+
+        item["topics"] = [hex_to_bytearray(t) for t in tpcs]
+
+        if "transaction_hash" in item:
+            item.pop("transaction_hash")
+
+        for elem in blob_colums:
+            item[elem] = hex_to_bytearray(item[elem])
+
+    items = [none_to_unset(row) for row in items]
+
+    cassandra_ingest(session, prepared_stmt, items)
 
 
 def ingest_blocks(
@@ -557,22 +598,22 @@ def main() -> None:
 
     prep_stmt = {
         elem: get_prepared_statement(session, args.keyspace, elem)
-        for elem in ["trace", "transaction", "block"]
+        for elem in ["trace", "transaction", "block", "log"]
     }
 
     for block_id in range(start_block, end_block + 1, args.batch_size):
-
         current_end_block = min(end_block, block_id + args.batch_size - 1)
 
         blocks, txs = adapter.export_blocks_and_transactions(
             block_id, current_end_block
         )
-        receipts, _ = adapter.export_receipts_and_logs(txs)
+        receipts, logs = adapter.export_receipts_and_logs(txs)
         traces = adapter.export_traces(block_id, current_end_block, True, True)
 
         enriched_txs = enrich_transactions(txs, receipts)
 
         # ingest into Cassandra
+        ingest_logs(logs, session, prep_stmt["log"], BLOCK_BUCKET_SIZE)
         ingest_traces(traces, session, prep_stmt["trace"], BLOCK_BUCKET_SIZE)
         ingest_transactions(
             enriched_txs, session, prep_stmt["transaction"], TX_HASH_PREFIX_LEN
@@ -592,10 +633,7 @@ def main() -> None:
             time1 = time2
             count = 0
 
-    print(
-        f"[{datetime.now()}] Processed block range "
-        f"{start_block:,}:{end_block:,}"
-    )
+    print(f"[{datetime.now()}] Processed block range " f"{start_block:,}:{end_block:,}")
 
     # store configuration details
     ingest_configuration(
