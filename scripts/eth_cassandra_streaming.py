@@ -265,8 +265,10 @@ def cassandra_ingest(
     prepared_stmt: PreparedStatement,
     parameters,
     concurrency: int = 100,
+    retry_thsh: int = 1000,
 ) -> None:
     """Concurrent ingest into Apache Cassandra."""
+    ctr = 0
     while True:
         try:
             results = execute_concurrent_with_args(
@@ -282,15 +284,23 @@ def cassandra_ingest(
                         try:
                             session.execute(prepared_stmt, parameters[i])
                         except Exception as exception:
+                            ctr += 1
+                            if ctr > retry_thsh:
+                                raise exception
                             print(exception)
                             continue
+                        ctr = 0
                         break
             break
 
         except Exception as exception:
+            ctr += 1
+            if ctr > retry_thsh:
+                raise exception
             print(exception)
             time.sleep(1)
             continue
+        ctr = 0
 
 
 def ingest_configuration(
@@ -339,7 +349,10 @@ def ingest_logs(
             tpcs = []
 
         if "topic0" not in item:
-            item["topic0"] = tpcs[0] if len(tpcs) > 0 else None
+            # bugfix do not use None for topic0 but 0x, None
+            # gets converted to UNSET which is not allowed for
+            # key columns in cassandra and can not be filtered
+            item["topic0"] = tpcs[0] if len(tpcs) > 0 else "0x"
 
         item["topics"] = [hex_to_bytearray(t) for t in tpcs]
 
