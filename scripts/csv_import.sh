@@ -26,3 +26,14 @@ dsbulk load -c csv -h "$DB_HOST" -k "$DB_KEYSPACE" -t trace -url "$DIR" \
     --connector.csv.recursive true \
     --schema.allowMissingFields true \
     --connector.csv.maxCharsPerColumn=-1
+
+
+dsbulk load -c csv -h "$DB_HOST" -k "$DB_KEYSPACE" -t log -url "$DIR" \
+    --connector.csv.fileNamePattern '**/logs_*.csv.gz' \
+    --connector.csv.compression gzip \
+    --connector.csv.recursive true \
+    --connector.csv.delimiter "|" \
+    --connector.csv.maxCharsPerColumn 8388608 \
+    --dsbulk.connector.csv.nullValue "" \
+    --dsbulk.connector.csv.ignoreLeadingWhitespaces true \
+    --dsbulk.connector.csv.ignoreTrailingWhitespaces true
