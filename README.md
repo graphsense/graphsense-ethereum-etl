@@ -54,6 +54,10 @@ PROVIDER_URI=http://127.0.0.1:8545
 PROVIDER_URI=file:///opt/openethereum/jsonrpc.ipc
 ```
 
+
+## Deprecated
+
+Ingesting exchange rates through this repo is deprecated. Please use the equivalent functionality in provided in the [graphsense-lib repository][graphsense-cli].
 Ethereum exchange rates are obtained through [CoinMarketCap][coinmarketcap].
 See `scripts/ingest_rates_coinmarketcap.py`.
 
@@ -62,3 +66,4 @@ See `scripts/ingest_rates_coinmarketcap.py`.
 [apache-cassandra]: http://cassandra.apache.org/download
 [python-cassandra]: https://github.com/datastax/python-driver
 [coinmarketcap]: https://coinmarketcap.com
+[graphsense-cli]: https://github.com/graphsense/graphsense-lib#exchange-rates
