@@ -3,11 +3,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [23.03/1.4.0] - 2023-03-29
+### Changed
+- Updated ethereum-etl version
+
 ## [23.01/1.3.0] - 2023-12-30
 ### Added
-- standard dev Makefile
+- Standard dev Makefile
 ### Deprecated
-- coindesk and coimarket script -> graphsense-lib provides the same features
+- Coindesk and CoinMarketCap exchange rate script (now in graphsense-lib)
 
 ## [22.11] 2022-11-24
 ### Added
