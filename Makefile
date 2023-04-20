@@ -3,9 +3,6 @@ RELEASESEM := 'v1.4.0'
 
 all: build
 
-build:
-	docker build -t blocksci .
-
 install:
 	pip install -r requirements.txt
 
