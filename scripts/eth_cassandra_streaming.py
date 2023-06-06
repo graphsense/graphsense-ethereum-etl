@@ -4,7 +4,7 @@
 
    Ingest blocks, transactions/receipts and traces into Apache Cassandra.
 """
-
+import warnings
 from argparse import ArgumentParser
 from datetime import datetime, timedelta, timezone
 import time
@@ -561,6 +561,8 @@ def print_block_info(
 
 def main() -> None:
     """Main function."""
+
+    warnings.warn("graphsense-ethereum-etl is deprecated. Please use https://github.com/graphsense/graphsense-lib -> graphsense-cli ingest which provides the same functionality", DeprecationWarning)
 
     args = create_parser().parse_args()
 

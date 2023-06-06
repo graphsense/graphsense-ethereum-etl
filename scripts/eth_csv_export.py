@@ -5,6 +5,7 @@
 Exports blocks, transactions/receipts and traces to CSV files.
 """
 
+import warnings
 from argparse import ArgumentParser
 from csv import DictWriter, QUOTE_NONE
 from datetime import datetime, timedelta, timezone
@@ -455,6 +456,8 @@ def create_parser() -> ArgumentParser:
 
 def main() -> None:
     """Main function."""
+
+    warnings.warn("graphsense-ethereum-etl is deprecated. Please use https://github.com/graphsense/graphsense-lib -> graphsense-cli ingest which provides the same functionality", DeprecationWarning)
 
     args = create_parser().parse_args()
 
